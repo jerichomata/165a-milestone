@@ -6,9 +6,12 @@ class Page:
         self.data = bytearray(4096)
 
     def has_capacity(self):
-        pass
 
     def write(self, value):
-        self.num_records += 1
-        pass
+        if self.has_capacity():
+            self.num_records += 1
+            self.data.append(value)
+            print("Written" + value)
+        else:
+
 
