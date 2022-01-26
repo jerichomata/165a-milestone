@@ -1,3 +1,4 @@
+from asyncio.windows_events import NULL
 from lstore.table import Table
 
 class Database():
@@ -27,10 +28,18 @@ class Database():
     # Deletes the specified table
     """
     def drop_table(self, name):
-        pass
+        for table in self.tables:
+            if table.name == name:
+                self.tables.remove(table)
+                print("dropped table " + table.name)
+                return
+        print("couldn't find " + table.name)
 
     """
     # Returns table with the passed name
     """
     def get_table(self, name):
-        pass
+        for table in self.tables:
+            if table.name == name:
+                return table
+        return NULL
