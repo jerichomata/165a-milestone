@@ -17,7 +17,7 @@ class Page:
 
     def write(self, value):
         if self.has_capacity():
-            self.data[self.num_records * 8: self.num_records*8 + 8] = struct.pack('>Q', value)
+            self.data[self.num_records * 8: self.num_records*8 + 8] = struct.pack('Q', value)
             self.num_records += 1
             print("Written" + str(value))
             return self.num_records - 1
@@ -25,8 +25,6 @@ class Page:
             print("Could not write")
 
     def read(self, record):
-        return struct.unpack('>Q', self.data[record * 8 : record*8 + 8])
+        return struct.unpack('Q', self.data[record * 8 : record*8 + 8])
 
-gay = Page()
-gay.write("fuck")
-print(gay.read(0))
+

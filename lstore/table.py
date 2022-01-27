@@ -22,13 +22,24 @@ class Table:
     :param name: string         #Table name
     :param num_columns: int     #Number of Columns: all columns are integer
     :param key: int             #Index of table key in columns
+    
+    name: name of the table
+    key: index of the table key
+    num_columns: number of columns in table
+    num_records: number of records in table
+    page_directory: rid | page, offset
+    base_pages: list of base pages
+    tail_pages: list of tail pages
     """
     def __init__(self, name, num_columns, key):
         self.name = name
         self.key = key
-        self.num_columns = num_columns
+        self.keys = {}
+        self.num_columns = num_columns + 4
         self.num_records = 0
         self.page_directory = {}
+        self.base_pages = []
+        self.tail_pages = []
         self.index = Index(self)
         pass
 
@@ -37,33 +48,39 @@ class Table:
         return self.num_records
 
     def find_record(self, key):
+        pass
 
 
-    def add_record(self, key, column_values):
+    def add_record(self, record):
 
-        if key <= self.key:
+        if record.key <= self.key:
             print('key already exists')
             return
 
-        column_values.insert(INDIRECTION_COLUMN, None)
-        column_values.insert(RID_COLUMN, self.get_rid())
-        column_values.insert(TIMESTAMP_COLUMN, time())
-        column_values.insert(SCHEMA_ENCODING_COLUMN, 0)
+        record.columns.insert(INDIRECTION_COLUMN, None)
+        record.columns.insert(RID_COLUMN, record.rid)
+        record.columns.insert(TIMESTAMP_COLUMN, time())
+        record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
 
-        record = Record(column_values[1], key, column_values)
 
-        for page in self.page_directory['base']:
-            if page.has_capacity():
-                page.write(record)
+        if len(self.base_pages) == 0:
+            for i in range(self.num_columns):
+                self.base_pages.append(Page())
+
+        for j in range(self.num_columns,0,-1):
+            index = len(self.base_pages)-j
+            if self.base_pages[index].has_capacity():
+                self.base_pages[index].write(record.columns[self.num_columns-j])
                 self.key += 1
-                return
-            
-        self.page_directory['base'].append(Page())
-        self.page_directory['base'][-1].write(record)
-        self.key += 1
+            else:
+                page = Page()
+                page.write(record.columns[self.num_columns-j])
+                self.base_pages.append(page)
+                self.key += 1
 
-    def update_record(self, key, column_values):
 
+    def update_record(self, record):
+        pass
 
 
 
