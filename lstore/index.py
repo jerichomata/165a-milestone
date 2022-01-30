@@ -2,6 +2,9 @@
 A data strucutre holding indices for various columns of a table. Key column should be indexd by default, other columns can be indexed through this object. Indices are usually B-Trees, but other data structures can be used as well.
 """
 
+from asyncio.windows_events import NULL
+
+
 class Index:
 
     def __init__(self, table):
@@ -45,10 +48,13 @@ class Index:
                 high = mid - 1;
             elif (lookup(column[mid] == end):
                 endIndex = mid;
-                high = mid - 1;
+                low = mid - 1;
             else:
                 low = mid + 1;
-        return (column[startIndex:(endIndex+1)])
+        if(startIndex == -1 or endIndex == -1):
+            return NULL
+        else:
+            return (column[startIndex:(endIndex+1])
 
     """
     # optional: Create index on specific column
