@@ -21,7 +21,34 @@ class Index:
     """
 
     def locate_range(self, begin, end, column):
-        pass
+        startIndex = -1
+        endIndex = -1
+        low = 0
+        high = len(column)
+        #Uses Binary Search to the first index to cut the list.
+
+        while (low <= high):
+            mid = int((high-low)/2 + low)
+            if (lookup(column[mid]) > begin):
+                high = mid - 1;
+            elif (lookup(column[mid] == begin):
+                startIndex = mid;
+                high = mid - 1;
+            else:
+                low = mid + 1;
+        #Uses Binary search again to find endIndex
+        low = 0
+        high = len(a)
+        while (low <= high):
+            mid = int((high-low)/2 + low)
+            if (lookup(column[mid] > end):
+                high = mid - 1;
+            elif (lookup(column[mid] == end):
+                endIndex = mid;
+                high = mid - 1;
+            else:
+                low = mid + 1;
+        return (column[startIndex:(endIndex+1)])
 
     """
     # optional: Create index on specific column
