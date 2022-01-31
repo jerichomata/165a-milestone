@@ -33,8 +33,7 @@ class Table:
     """
     def __init__(self, name, num_columns, key):
         self.name = name
-        self.key = key
-        self.keys = {}
+        self.primary_key_column = key + 4
         self.num_columns = num_columns + 4
         self.num_records = 0
         self.page_directory = {}
@@ -47,8 +46,14 @@ class Table:
         self.num_records += 1
         return self.num_records
 
-    def find_record(self, key):
-        pass
+    def get_value(self, base_rid, column):
+        location = self.page_directory[base_rid]
+        rid = self.base_pages[location[0] * self.num_columns].read(location[1])
+        if (rid != None):
+            location = self.page_directory[rid]
+            return self.tail_pages[location[0] * self.num_columns + column].read(location[1])
+        else:
+            return self.base_pages[location[0] * self.num_columns + column].read(location[1])
 
 
     def add_record(self, record):

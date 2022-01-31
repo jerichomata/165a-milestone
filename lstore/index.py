@@ -5,12 +5,48 @@ A data strucutre holding indices for various columns of a table. Key column shou
 from asyncio.windows_events import NULL
 
 
+def cmp(a, b):
+    return (a > b) - (a < b)
+
+
 class Index:
 
     def __init__(self, table):
         # One index for each table. All our empty initially.
+        self.table = table
         self.indices = [None] *  table.num_columns
         pass
+
+
+    def sorted_insert(self, record, base_rid):
+        if len(self.indices[0]) == 0:
+            for index in self.indices:
+                index.append(base_rid)
+            return
+
+        for i, index in enumerate(self.indices):
+            low = 0
+            high = len(self.indices[0])-1
+            mid = 0
+            comparison = 0
+            while (low < high):
+                mid = int(high + low/2)
+                comparison = cmp(record.columns[i],self.table.get_value(mid, i))
+                if (comparison > 0):
+                    low = mid + 1
+                elif(comparison < 0):
+                    high = mid - 1
+                else:
+                    break
+
+            if (comparison > 0):
+                mid += 1
+            
+            self.indices[i].insert(mid, record.columns[i])
+        
+
+
+
 
     """
     # returns the location of all records with the given value on column "column"
@@ -34,7 +70,7 @@ class Index:
             mid = int((high-low)/2 + low)
             if (lookup(column[mid]) > begin):
                 high = mid - 1;
-            elif (lookup(column[mid] == begin):
+            elif (lookup(column[mid] == begin)):
                 startIndex = mid;
                 high = mid - 1;
             else:
@@ -44,9 +80,9 @@ class Index:
         high = len(a)
         while (low <= high):
             mid = int((high-low)/2 + low)
-            if (lookup(column[mid] > end):
+            if (lookup(column[mid] > end)):
                 high = mid - 1;
-            elif (lookup(column[mid] == end):
+            elif (lookup(column[mid] == end)):
                 endIndex = mid;
                 low = mid - 1;
             else:
@@ -54,7 +90,7 @@ class Index:
         if(startIndex == -1 or endIndex == -1):
             return NULL
         else:
-            return (column[startIndex:(endIndex+1])
+            return (column[startIndex:(endIndex+1)])
 
     """
     # optional: Create index on specific column

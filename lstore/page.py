@@ -24,7 +24,7 @@ class Page:
         else:
             print("Could not write")
 
-    def read(self, record):
-        return struct.unpack('Q', self.data[record * 8 : record*8 + 8])
+    def read(self, offset):
+        return struct.unpack('Q', self.data[offset * 8 : offset*8 + 8])
 
 
