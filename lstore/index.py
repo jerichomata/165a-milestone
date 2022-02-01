@@ -3,6 +3,7 @@ A data strucutre holding indices for various columns of a table. Key column shou
 """
 
 from asyncio.windows_events import NULL
+from operator import contains
 
 
 def cmp(a, b):
@@ -43,10 +44,15 @@ class Index:
                 mid += 1
             
             self.indices[i].insert(mid, record.columns[i])
-        
 
+    def drop_record(self, rid):
+        for index in self.indices:
+            if rid in index:
+                index.remove(rid)
 
-
+    def update(self, record, base_rid):
+        self.drop_record(base_rid)
+        self.sorted_insert(record, base_rid)
 
     """
     # returns the location of all records with the given value on column "column"

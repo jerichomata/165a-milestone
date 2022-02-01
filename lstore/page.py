@@ -9,6 +9,7 @@ class Page:
         self.num_records = 0
         self.data = bytearray(4096)
 
+
     def has_capacity(self):
         if(self.num_records * 8 < len(self.data)):
             return True
@@ -20,11 +21,17 @@ class Page:
             self.data[self.num_records * 8: self.num_records*8 + 8] = struct.pack('Q', value)
             self.num_records += 1
             print("Written" + str(value))
-            return self.num_records - 1
         else:
             print("Could not write")
 
+
     def read(self, offset):
         return struct.unpack('Q', self.data[offset * 8 : offset*8 + 8])
+
+    def set_value(self, value, offset):
+        if offset < self.num_records:  
+            self.data[offset * 8:offset * 8 + 8] = struct.pack('Q', value)
+        else:
+            print("Could not write")
 
 
