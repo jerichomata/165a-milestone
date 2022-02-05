@@ -76,9 +76,9 @@ class Index:
 
         while (low <= high):
             mid = int((high-low)/2 + low)
-            if (this.table.get_value(column[mid], index) > begin):
+            if (this.table.get_newest_value(column[mid], index) > begin):
                 high = mid - 1;
-            elif (this.table.get_value(column[mid], index) == begin):
+            elif (this.table.get_newest_value(column[mid], index) == begin):
                 startIndex = mid;
                 high = mid - 1;
             else:
@@ -88,14 +88,15 @@ class Index:
         high = len(column)
         while (low <= high):
             mid = int((high-low)/2 + low)
-            if (this.table.get_value(column[mid], index) > end):
+            if (this.table.get_newest_value(column[mid], index) > end):
                 high = mid - 1;
-            elif (this.table.get_value(column[mid], index) == end):
+            elif (this.table.get_newest_value(column[mid], index) == end):
                 endIndex = mid;
                 low = mid - 1;
             else:
                 low = mid + 1;
         if(startIndex == -1 or endIndex == -1):
+            print("locate_range: Could not find value in list.")
             return NULL
         else:
             return (column[startIndex:(endIndex+1)])
