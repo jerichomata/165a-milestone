@@ -59,8 +59,25 @@ class Index:
     # returns the location of all records with the given value on column "column"
     """
 
-    def locate(self, column, value):
-        pass
+    def locate(self, index, value):
+        records = []
+        column = this.indices[index]
+        low = 0
+        high = len(column)-1
+        while(low <= high):
+            mid = int((high-low)/2 + low)
+            if (this.table.get_newest_value(column[mid], index) > value):
+                high = mid - 1;
+            elif (this.table.get_newest_value(column[mid], index) == value):
+                records.append(value)
+                high - mid - 1;
+            else:
+                low = mid + 1;
+        if(len(records) == 0):
+            print("locate: Could not find value in list.")
+            return None
+        return records
+        
 
     """
     # Returns the RIDs of all records with values in column "column" between "begin" and "end"
@@ -97,7 +114,7 @@ class Index:
                 low = mid + 1;
         if(startIndex == -1 or endIndex == -1):
             print("locate_range: Could not find value in list.")
-            return NULL
+            return None
         else:
             return (column[startIndex:(endIndex+1)])
 
