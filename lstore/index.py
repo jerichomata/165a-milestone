@@ -92,7 +92,7 @@ class Index:
                 high = mid - 1;
             elif (this.table.get_newest_value(column[mid], index) == end):
                 endIndex = mid;
-                low = mid - 1;
+                low = mid + 1;
             else:
                 low = mid + 1;
         if(startIndex == -1 or endIndex == -1):
