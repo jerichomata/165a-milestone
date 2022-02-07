@@ -27,13 +27,13 @@ class Index:
                 self.indices.append(temp_list)
             return
         
-        if (len(self.indices[0]) == 1):
-            for i in range(self.table.num_columns):
-                if (self.indices[i][0] < record.columns[i]):
-                    self.indices[i].append(base_rid)
-                else:
-                    self.indices[i].insert(0, base_rid)
-            return
+        # if (len(self.indices[0]) == 1):
+        #     for i in range(self.table.num_columns):
+        #         if (self.indices[i][0] < record.columns[i]):
+        #             self.indices[i].append(base_rid)
+        #         else:
+        #             self.indices[i].insert(0, base_rid)
+        #     return
 
         for i, index in enumerate(self.indices):
             
@@ -42,18 +42,20 @@ class Index:
             mid = 0
             comparison = 0
             while (low < high):
-                mid = int(high + low//2)
+                mid = int((low+high)//2)
                 comparison = cmp(record.columns[i], self.table.get_newest_value(self.indices[i][mid], i))
                 if (comparison > 0):
                     low = mid + 1
                 elif(comparison < 0):
-                    high = mid - 1
+                    high = mid
                 else:
                     break
 
             if (comparison >= 0):
                 mid += 1
-            self.indices[i].insert(mid, base_rid)
+            self.indices[i].insert(mid+1, base_rid)
+            print(self.indices)
+
             
         
 
@@ -82,7 +84,7 @@ class Index:
         low = 0
         high = len(column)-1
         while(low <= high):
-            mid = int((high-low)/2 + low)
+            mid = int((low+high)//2)
             if (self.table.get_newest_value(column[mid], index) > value):
                 high = mid - 1
             elif (self.table.get_newest_value(column[mid], index) == value):
@@ -123,7 +125,7 @@ class Index:
         #Uses Binary Search to the first index to cut the list.
 
         while (low <= high):
-            mid = int(high + low/2)
+            mid = int((low+high)//2)
             if (self.table.get_newest_value(column[mid], index) > begin):
                 high = mid - 1
             elif (self.table.get_newest_value(column[mid], index) == begin):
@@ -137,7 +139,7 @@ class Index:
         low = 0
         high = len(column)-1
         while (low <= high):
-            mid = int(high + low/2)
+            mid = int((low+high)//2)
             if (self.table.get_newest_value(column[mid], index) > end):
                 high = mid - 1
             elif (self.table.get_newest_value(column[mid], index) == end):
