@@ -1,4 +1,4 @@
-from lstore.table import SCHEMA_ENCODING_COLUMN, Table, Record
+from lstore.table import Table, Record
 from lstore.index import Index
 
 
@@ -115,16 +115,7 @@ class Query:
     """
 
     def update(self, primary_key, *columns):
-        columns_list = list(columns)
-        if len(columns_list) != self.table.num_columns:
-            return False
-        if columns_list[0] != None:
-            # You cannot update the primary key
-            return False
-
-        valid_rid = self.table.record_does_exist(primary_key=primary_key)
-        if valid_rid == None:
-            return False
+        pass
         
 
     """
