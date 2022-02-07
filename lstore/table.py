@@ -55,7 +55,7 @@ class Table:
                 return current_rid
 
 
-    def get_rid(self):
+    def get_new_rid(self):
         self.num_records += 1
         return self.num_records
 

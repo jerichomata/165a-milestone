@@ -12,6 +12,7 @@ class Query:
 
     def __init__(self, table):
         self.table = table
+        self.keys = []
         pass
 
     """
@@ -22,7 +23,22 @@ class Query:
     """
 
     def delete(self, primary_key):
-        pass
+        if(primary_key in self.keys):
+            self.table.delete_record(primary_key)
+            return True
+        return False
+
+    """
+    # generates new key
+    """
+
+    def get_key(self):
+        if(self.keys):
+            self.keys.append(self.keys[-1] += 1)
+            return self.keys[-1]
+        self.keys.append(1)
+        return self.keys[-1] 
+    
     """
     # Insert a record with specified columns
     # Return True upon succesful insertion
@@ -30,8 +46,9 @@ class Query:
     """
 
     def insert(self, *columns):
-        schema_encoding = '0' * self.table.num_columns
-        pass
+        new_record = Record(self.table.get_rid(), self.get_key(), columns)
+        self.table.add_record(new_record)
+        return True
 
     """
     # Read a record with specified key
@@ -44,7 +61,13 @@ class Query:
     """
 
     def select(self, index_value, index_column, query_columns):
-        pass
+        records_objects = []
+        for i in range(0, len(query_columns)):
+            if(query_columns[i] == 1):
+                records_objects.append(self.table.get_newest_value(self.table.index.locate(index_column, index_value)))
+            index_column += 4
+        return records_objects
+        
     """
     # Update a record with specified key and columns
     # Returns True if update is succesful
@@ -52,7 +75,13 @@ class Query:
     """
 
     def update(self, primary_key, *columns):
-        pass
+        if(primary_key in self.keys):
+            rid = self.table.get_rid()
+            new_record = Record(rid, primary_key, columns)
+            self.table.update_record(new_record, rid)
+            return True
+        return False
+            
 
     """
     :param start_range: int         # Start of the key range to aggregate 
@@ -64,7 +93,13 @@ class Query:
     """
 
     def sum(self, start_range, end_range, aggregate_column_index):
-        pass
+        sum = 0
+        rids = self.table.index.locate_range(start_range, end_range)
+        if(rids):
+            for rid in rids:
+                sum += self.table.get_newest_value(rid, aggregate_column_index)
+            return True
+        return False
 
     """
     incremenets one column of the record
