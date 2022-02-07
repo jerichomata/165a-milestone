@@ -57,9 +57,9 @@ class Query:
         records_objects = []
         for i in range(0, len(query_columns)):
             if(query_columns[i] == 1):
-                location = self.table.index.locate(index_value, index_column+4)[0]
+                location = self.table.index.locate(index_value, index_column+4)
                 if(location is not None):
-                    records_objects.append(self.table.get_newest_value(location, i+4))
+                    records_objects.append(self.table.get_newest_value(location[0], i+4))
                 else:
                     return False
         return records_objects

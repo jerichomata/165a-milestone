@@ -75,10 +75,9 @@ class Index:
 
     def locate(self, value, index = -1):
         if (index == -1):
-            column = self.indices[self.table.primary_key_column]
             index = self.table.primary_key_column
-        else:
-            column = self.indices[index]
+            
+        column = self.indices[index]
         records = []
         low = 0
         high = len(column)-1
@@ -114,9 +113,9 @@ class Index:
 
     def locate_range(self, begin, end, index = -1):
         if (index == -1):
-            column = self.indices[self.table.primary_key_column]
-        else:
-            column = self.indices[index]
+            index = self.table.primary_key_column
+            
+        column = self.indices[index]
         start_index = -1
         end_index = -1
         low = 0
@@ -129,7 +128,7 @@ class Index:
                 high = mid - 1
             elif (self.table.get_newest_value(column[mid], index) == begin):
                 start_index = mid
-                while(self.table.get_newest_value(column[start_index], index) == begin):
+                while(self.table.get_newest_value(column[start_index], index) == begin and start_index > low):
                     start_index-=1
                 break
             else:
@@ -143,7 +142,7 @@ class Index:
                 high = mid - 1
             elif (self.table.get_newest_value(column[mid], index) == end):
                 end_index = mid
-                while(self.table.get_newest_value(column[end_index], index) == end):
+                while(self.table.get_newest_value(column[end_index], index) == end and end_index < high):
                     end_index+=1
                 break
             else:
