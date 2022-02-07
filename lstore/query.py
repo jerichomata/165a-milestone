@@ -115,8 +115,13 @@ class Query:
     """
 
     def update(self, primary_key, *columns):
-        pass
-        
+        rid = self.table.index.locate(primary_key)
+        if(rid == None):
+            return False
+        else:
+            new_record = Record(rid, primary_key, columns)
+            self.table.update_record(new_record, rid)
+            return True
 
     """
     :param start_range: int         # Start of the key range to aggregate 
