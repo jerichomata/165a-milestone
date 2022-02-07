@@ -165,7 +165,6 @@ class Table:
                 page = Page()
                 page.write(record.columns[j])
                 self.tail_pages.append(page)
-
             index = len(self.tail_pages)-1
 
         page_number = (len(self.tail_pages)/self.num_columns) - 1

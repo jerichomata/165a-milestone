@@ -59,16 +59,15 @@ class Index:
 
     def drop_record(self, rid):
         for i in range(len(self.indices)):
-            if rid in self.indices[i]:
-                self.indices[i].remove(rid)
+            self.indices[i].remove(rid)
 
     def update(self, record, base_rid):
         self.drop_record(base_rid)
         self.sorted_insert(record, base_rid)
 
-    def print_keys(self):
-        for item in self.indices[self.table.primary_key_column]:
-            print(self.table.get_value(item, self.table.primary_key_column))
+    def print_keys(self, column):
+        for item in self.indices[column]:
+            print(self.table.get_value(item, column))
 
     """
     # returns the location of all records with the given value on column "column"
@@ -145,7 +144,7 @@ class Index:
             elif (self.table.get_newest_value(column[mid], index) == end):
                 end_index = mid
                 while(self.table.get_newest_value(column[end_index], index) == end):
-                    end_index-=1
+                    end_index+=1
                 break
             else:
                 low = mid + 1
@@ -154,7 +153,7 @@ class Index:
             print(str(begin) + " " + str(end))
             return None
         else:
-            return (column[start_index:(end_index+1)])
+            return (column[start_index+1:end_index])
 
     """
     # optional: Create index on specific column
