@@ -1,6 +1,6 @@
 from logging import NullHandler
-from lstore.index import Index
-from lstore.page import Page
+from index import Index
+from page import Page
 from time import time
 
 INDIRECTION_COLUMN = 0
@@ -39,7 +39,7 @@ class Table:
         self.name = name
         self.primary_key_column = key + 4
         self.num_columns = num_columns + 4
-        self.num_records = 0
+        self.num_records = 1
         self.page_directory = {}
         self.base_pages = []
         self.tail_pages = []
@@ -62,7 +62,7 @@ class Table:
     def get_newest_value(self, base_rid, column):
         location = self.page_directory[base_rid]
         rid = self.base_pages[location[1] * self.num_columns].read(location[2])
-        if (rid[0] != 1):
+        if (rid != 1):
             location = self.page_directory[rid]
             return self.tail_pages[location[1] * self.num_columns + column].read(location[2])
         else:
@@ -90,7 +90,7 @@ class Table:
 
 
     def add_record(self, record):
-        record.columns.insert(INDIRECTION_COLUMN, 0)
+        record.columns.insert(INDIRECTION_COLUMN, 1)
         record.columns.insert(RID_COLUMN, record.rid)
         record.columns.insert(TIMESTAMP_COLUMN, time())
         record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
@@ -109,6 +109,7 @@ class Table:
                 page = Page()
                 page.write(record.columns[j])
                 self.base_pages.append(page)
+            index = len(self.base_pages)-1
 
         page_number = (len(self.base_pages)/self.num_columns) - 1
         offset = self.base_pages[index].num_records - 1
@@ -146,6 +147,12 @@ class Table:
 
         record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
 
+        for i, columns in enumerate(record.columns):
+            if(columns == None):
+                columns = self.get_value(old_base_indirection, i)
+
+
+
         #Set indirection column on base page to point to this record.
         self.set_value(new_rid, base_rid, INDIRECTION_COLUMN)
 
@@ -170,7 +177,7 @@ class Table:
         self.index.update(record, base_rid)
 
     def delete_record(self, key):
-        starting_rid = self.index.locate(key)[0]
+        starting_rid = self.index.locate(key)
         self.index.drop_record(starting_rid)
 
         current_rid = self.get_value(starting_rid, 0)

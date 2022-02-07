@@ -1,5 +1,5 @@
-from lstore.table import Table, Record
-from lstore.index import Index
+from table import Table, Record
+from index import Index
 
 
 class Query:
@@ -34,7 +34,7 @@ class Query:
 
     def get_key(self):
         if(self.keys):
-            self.keys.append(self.keys[-1] += 1)
+            self.keys.append(self.keys[-1] + 1)
             return self.keys[-1]
         self.keys.append(1)
         return self.keys[-1] 
@@ -46,7 +46,8 @@ class Query:
     """
 
     def insert(self, *columns):
-        new_record = Record(self.table.get_rid(), self.get_key(), columns)
+        columns =  list(columns)
+        new_record = Record(self.table.get_new_rid(), self.get_key(), columns)
         self.table.add_record(new_record)
         return True
 
@@ -64,8 +65,11 @@ class Query:
         records_objects = []
         for i in range(0, len(query_columns)):
             if(query_columns[i] == 1):
-                records_objects.append(self.table.get_newest_value(self.table.index.locate(index_column, index_value)))
-            index_column += 4
+                location = self.table.index.locate(index_value, index_column+4)
+                if(location is not None):
+                    records_objects.append(self.table.get_newest_value(location, i))
+                else:
+                    return False
         return records_objects
         
     """
