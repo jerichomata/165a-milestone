@@ -71,9 +71,7 @@ class Query:
     """
 
     def update(self, primary_key, *columns):
-        print(self.table.index.print_keys())
         if(primary_key in self.keys):
-            print(self.table.index.indices)
             base_rid = self.table.index.locate(primary_key)
             if base_rid is None:
                 return False

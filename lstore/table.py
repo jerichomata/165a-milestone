@@ -138,20 +138,16 @@ class Table:
         schema_encoding = ""
 
         for i in range(self.num_columns):
-            if self.get_value(old_base_indirection, i) != record.columns[i]:
-                schema_encoding += "1"
-            else:
+            if(record.columns[i] == None):
+                record.columns[i] = self.get_value(old_base_indirection, i)
                 schema_encoding += "0"
+            else:
+                schema_encoding += "1"
+
         for i in range(self.num_columns,64):
             schema_encoding += "0"
 
-        
         self.set_value(int(schema_encoding,2), old_base_indirection, SCHEMA_ENCODING_COLUMN)
-
-
-        for i in range(len(record.columns)):
-            if(record.columns[i] == None):
-                record.columns[i] = self.get_value(old_base_indirection, i)
 
         #Set indirection column on base page to point to this record.
         self.set_value(new_rid, base_rid, INDIRECTION_COLUMN)
@@ -170,6 +166,8 @@ class Table:
                 page.write(record.columns[j])
                 self.tail_pages.append(page)
 
+            index = len(self.tail_pages)-1
+
         page_number = (len(self.tail_pages)/self.num_columns) - 1
         offset = self.tail_pages[index].num_records - 1
 
@@ -177,15 +175,15 @@ class Table:
         self.index.update(record, base_rid)
 
     def delete_record(self, key):
-        starting_rid = self.index.locate(key)
+        starting_rid = self.index.locate(key)[0]
         self.index.drop_record(starting_rid)
 
-        current_rid = self.get_value(starting_rid, 0)
-        while(current_rid != starting_rid):
-            self.set_value(0, current_rid, 0)
-            current_rid = self.get_value(current_rid, 0)
+        current_rid = self.get_value(starting_rid, INDIRECTION_COLUMN)
+        while(current_rid != starting_rid and current_rid != 1):
+            self.set_value(0, current_rid, RID_COLUMN)
+            current_rid = self.get_value(current_rid, INDIRECTION_COLUMN)
 
-        self.set_value(0, starting_rid, 0)
+        self.set_value(0, starting_rid, RID_COLUMN)
 
 
     def __merge(self):
