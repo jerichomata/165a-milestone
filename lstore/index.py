@@ -71,7 +71,7 @@ class Index:
             if (self.table.get_newest_value(column[mid], index) > value):
                 high = mid - 1;
             elif (self.table.get_newest_value(column[mid], index) == value):
-                records.append(value)
+                records.append(column[mid])
                 high - mid - 1;
             else:
                 low = mid + 1;
