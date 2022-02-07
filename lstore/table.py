@@ -1,5 +1,4 @@
 from logging import NullHandler
-from msilib import schema
 from lstore.index import Index
 from lstore.page import Page
 from time import time
@@ -76,6 +75,7 @@ class Table:
             return self.base_pages[(page * self.num_columns) + column].read(offset)
         else:
             return self.tail_pages[(page * self.num_columns) + column].read(offset)
+
 
     def set_value(self, value, rid, column):
         base, page, offset = self.page_directory[rid]
@@ -170,7 +170,7 @@ class Table:
         self.index.update(record, base_rid)
 
     def delete_record(self, key):
-        starting_rid = self.index.locate(key)
+        starting_rid = self.index.locate(key)[0]
         self.index.drop_record(starting_rid)
 
         current_rid = self.get_value(starting_rid, 0)
