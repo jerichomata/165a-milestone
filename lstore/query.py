@@ -29,6 +29,8 @@ class Query:
         
         # Once found, update delete value to true in page directory
         self.table.page_directory[rid]["deleted"] = True
+            # rid is just a list 
+            # use drop record in index 
         return True
 
     """
@@ -83,6 +85,9 @@ class Query:
 
         # Make sure that the record selected by the user exists in our database
         valid_rid = self.table.record_does_exist(index_key=index_key)
+            # use locate instead in index
+            # index stored in table 
+            # table.index.locate 
         if valid_rid == None:
             return False
 
@@ -132,21 +137,23 @@ class Query:
     """
 
     def sum(self, start_range, end_range, aggregate_column_index):
-        summation = 0
-        none_in_range = True
-        for key in range(start_range, end_range + 1):
-            if key not in self.keyToRID:
-                record = False
-            else:
-                baseRID = self.keyToRID[key]
-                selectedPageRange  = self.getPageRange(baseRID)
-                record = self.page_directory[selectedPageRange].select(key, baseRID)
-                none_in_range = False
-                summation += record.columns[aggregate_column_index]
-        if (none_in_range):
-            return False
-        else:
-            return summation
+        keys = sorted(self.table.keys)
+        start_index = 0
+        end_index = 0
+        count = 0
+        for key in keys:
+            if key == start_range:
+                start_index = count
+            elif key == end_range:
+                end_index = count
+            count += 1
+        selected_keys = keys[start_index : end_index + 1]
+        result = 0
+        for key in selected_keys:
+            encoder = [0] * self.table.num_columns
+            encoder[aggregate_column_index] = 1
+            result += (self.select(key, encoder))[0].columns[aggregate_column_index]
+        return result
 
     """
     incremenets one column of the record
