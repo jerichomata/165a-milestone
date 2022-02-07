@@ -61,28 +61,28 @@ class Table:
 
     def get_newest_value(self, base_rid, column):
         location = self.page_directory[base_rid]
-        rid = self.base_pages[location[1] * self.num_columns].read(location[2])
+        rid = self.base_pages[int(location[1] * self.num_columns)].read(location[2])
         if (rid != 1):
             location = self.page_directory[rid]
-            return self.tail_pages[location[1] * self.num_columns + column].read(location[2])
+            return self.tail_pages[int(location[1] * self.num_columns) + column].read(location[2])
         else:
-            return self.base_pages[location[1] * self.num_columns + column].read(location[2])
+            return self.base_pages[int(location[1] * self.num_columns) + column].read(location[2])
 
 
     def get_value(self, rid, column):
         base, page, offset = self.page_directory[rid]
         if base:
-            return self.base_pages[(page * self.num_columns) + column].read(offset)
+            return self.base_pages[int(page * self.num_columns) + column].read(offset)
         else:
-            return self.tail_pages[(page * self.num_columns) + column].read(offset)
+            return self.tail_pages[int(page * self.num_columns) + column].read(offset)
 
 
     def set_value(self, value, rid, column):
         base, page, offset = self.page_directory[rid]
         if base:
-            return self.base_pages[(page * self.num_columns) + column].set_value(value, offset)
+            return self.base_pages[int(page * self.num_columns) + column].set_value(value, offset)
         else:
-            return self.tail_pages[(page * self.num_columns) + column].set_value(value, offset)
+            return self.tail_pages[int(page * self.num_columns) + column].set_value(value, offset)
 
 
     def is_base(self, rid):
@@ -133,6 +133,8 @@ class Table:
 
         record.columns.insert(TIMESTAMP_COLUMN, time())
 
+        record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
+
         schema_encoding = ""
 
         for i in range(self.num_columns):
@@ -142,16 +144,14 @@ class Table:
                 schema_encoding += "0"
         for i in range(self.num_columns,64):
             schema_encoding += "0"
+
         
         self.set_value(int(schema_encoding,2), old_base_indirection, SCHEMA_ENCODING_COLUMN)
 
-        record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
 
-        for i, columns in enumerate(record.columns):
-            if(columns == None):
-                columns = self.get_value(old_base_indirection, i)
-
-
+        for i in range(len(record.columns)):
+            if(record.columns[i] == None):
+                record.columns[i] = self.get_value(old_base_indirection, i)
 
         #Set indirection column on base page to point to this record.
         self.set_value(new_rid, base_rid, INDIRECTION_COLUMN)

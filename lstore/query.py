@@ -25,19 +25,10 @@ class Query:
     def delete(self, primary_key):
         if(primary_key in self.keys):
             self.table.delete_record(primary_key)
+            self.keys.remove(primary_key)
             return True
         return False
 
-    """
-    # generates new key
-    """
-
-    def get_key(self):
-        if(self.keys):
-            self.keys.append(self.keys[-1] + 1)
-            return self.keys[-1]
-        self.keys.append(1)
-        return self.keys[-1] 
     
     """
     # Insert a record with specified columns
@@ -47,7 +38,8 @@ class Query:
 
     def insert(self, *columns):
         columns =  list(columns)
-        new_record = Record(self.table.get_new_rid(), self.get_key(), columns)
+        new_record = Record(self.table.get_new_rid(), columns[self.table.primary_key_column-4], columns)
+        self.keys.append(columns[self.table.primary_key_column-4])
         self.table.add_record(new_record)
         return True
 
@@ -65,9 +57,9 @@ class Query:
         records_objects = []
         for i in range(0, len(query_columns)):
             if(query_columns[i] == 1):
-                location = self.table.index.locate(index_value, index_column+4)
+                location = self.table.index.locate(index_value, index_column+4)[0]
                 if(location is not None):
-                    records_objects.append(self.table.get_newest_value(location, i))
+                    records_objects.append(self.table.get_newest_value(location, i+4))
                 else:
                     return False
         return records_objects
@@ -79,10 +71,19 @@ class Query:
     """
 
     def update(self, primary_key, *columns):
+        print(self.table.index.print_keys())
         if(primary_key in self.keys):
-            rid = self.table.get_rid()
-            new_record = Record(rid, primary_key, columns)
-            self.table.update_record(new_record, rid)
+            print(self.table.index.indices)
+            base_rid = self.table.index.locate(primary_key)
+            if base_rid is None:
+                return False
+            else:
+                base_rid = base_rid[0]
+            
+            rid = self.table.get_new_rid()
+            new_record = Record(rid, primary_key, list(columns))
+            self.table.update_record(new_record, base_rid)
+
             return True
         return False
             
