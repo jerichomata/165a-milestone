@@ -58,7 +58,7 @@ class Index:
     # returns the location of all records with the given value on column "column"
     """
 
-    def locate(self, index, value):
+    def locate(self, value, index = -1):
         if (index == -1):
             column = self.indices[self.table.primary_key_column]
         else:
