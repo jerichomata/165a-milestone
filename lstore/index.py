@@ -5,6 +5,7 @@ A data strucutre holding indices for various columns of a table. Key column shou
 from asyncio.windows_events import NULL
 from email.mime import base
 from operator import contains
+from tkinter.tix import COLUMN
 
 
 def cmp(a, b):
@@ -27,16 +28,16 @@ class Index:
                 self.indices.append(temp_list)
             return
         
-        # if (len(self.indices[0]) == 1):
-        #     for i in range(self.table.num_columns):
-        #         if (self.indices[i][0] < record.columns[i]):
-        #             self.indices[i].append(base_rid)
-        #         else:
-        #             self.indices[i].insert(0, base_rid)
-        #     return
+        if (len(self.indices[0]) == 1):
+            for i in range(self.table.num_columns):
+                if (self.indices[i][0] < record.columns[i]):
+                    self.indices[i].append(base_rid)
+                else:
+                    self.indices[i].insert(0, base_rid)
+            return
+        print(record.columns)
 
         for i, index in enumerate(self.indices):
-            
             low = 0
             high = len(self.indices[i])-1
             mid = 0
@@ -47,14 +48,19 @@ class Index:
                 if (comparison > 0):
                     low = mid + 1
                 elif(comparison < 0):
-                    high = mid
+                    high = mid - 1
                 else:
+                    mid + 1
                     break
-
-            if (comparison >= 0):
-                mid += 1
-            self.indices[i].insert(mid+1, base_rid)
-            print(self.indices)
+            
+            if(comparison == 0):
+                self.indices[i].insert(mid, base_rid)
+            elif(comparison > 0):
+                self.indices[i].insert(low+1, base_rid)
+            elif(comparison < 0):
+                self.indices[i].insert(low, base_rid)
+        self.print_keys(self.table.primary_key_column)
+                
 
             
         
@@ -103,7 +109,7 @@ class Index:
             else:
                 low = mid + 1
         if(len(records) == 0):
-            print("locate: Could not find value in list.")
+            print("locate: Could not find" + str(value) + "in list.")
             
             return None
         return records

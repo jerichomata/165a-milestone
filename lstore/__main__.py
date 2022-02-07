@@ -11,8 +11,10 @@ keys = []
 
 insert_time_0 = process_time()
 for i in range(0, 10):
-    query.insert(906659671 + i, 93, 0, 0, 0)
-    keys.append(906659671 + i)
+    # query.insert(906659671 + i, 93, 0, 0, 0)
+    # keys.append(906659671 + i)
+    query.insert(i, 93, 0, 0, 0)
+    keys.append(i)
 insert_time_1 = process_time()
 
 print("Inserting 10k records took:  \t\t\t", insert_time_1 - insert_time_0)
@@ -27,7 +29,7 @@ print("Inserting 10k records took:  \t\t\t", insert_time_1 - insert_time_0)
 # ]
 
 # update_time_0 = process_time()
-# for i in range(0, 10000):
+# for i in range(0, 10):
 #     query.update(choice(keys), *(choice(update_cols)))
 # update_time_1 = process_time()
 # print("Updating 10k records took:  \t\t\t", update_time_1 - update_time_0)
