@@ -59,12 +59,12 @@ class Table:
 
     def get_newest_value(self, base_rid, column):
         location = self.page_directory[base_rid]
-        rid = self.base_pages[location[0] * self.num_columns].read(location[1])
+        rid = self.base_pages[int(location[1] * self.num_columns)].read(location[2])
         if (rid != None):
             location = self.page_directory[rid]
-            return self.tail_pages[location[0] * self.num_columns + column].read(location[1])
+            return self.tail_pages[int(location[1] * self.num_columns) + column].read(location[2])
         else:
-            return self.base_pages[location[0] * self.num_columns + column].read(location[1])
+            return self.base_pages[int(location[1] * self.num_columns) + column].read(location[2])
 
 
     def get_value(self, rid, column):
@@ -156,3 +156,9 @@ class Table:
         print("merge is happening")
         pass
  
+
+new_record = Record(1, 1, [24,25,27])
+table = Table("stuff", 3, 0)
+table.add_record(new_record)
+
+table.get_newest_value(1, 4)

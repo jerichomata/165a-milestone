@@ -18,6 +18,7 @@ class Page:
 
     def write(self, value):
         if self.has_capacity():
+            value = int(value)
             self.data[self.num_records * 8: self.num_records*8 + 8] = struct.pack('Q', value)
             self.num_records += 1
             print("Written" + str(value))

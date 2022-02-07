@@ -1,10 +1,9 @@
 """
-A data strucutre holding indices for various columns of a table. Key column should be indexd by default, other columns can be indexed through this object. Indices are usually B-Trees, but other data structures can be used as well.
+A data strucutre holding indices for various columns of a table. Key column should be indexd by default, other columns can be indexed through self object. Indices are usually B-Trees, but other data structures can be used as well.
 """
 
 from asyncio.windows_events import NULL
 from operator import contains
-import this
 
 
 def cmp(a, b):
@@ -21,9 +20,9 @@ class Index:
 
 
     def sorted_insert(self, record, base_rid):
-        if len(self.indices[0]) == 0:
+        if self.indices[0] == None:
             for index in self.indices:
-                index.append(base_rid)
+                index = [base_rid]
             return
 
         for i, index in enumerate(self.indices):
@@ -60,15 +59,18 @@ class Index:
     """
 
     def locate(self, index, value):
+        if (index == -1):
+            column = self.indices[self.table.primary_key_column]
+        else:
+            column = self.indices[index]
         records = []
-        column = this.indices[index]
         low = 0
         high = len(column)-1
         while(low <= high):
             mid = int((high-low)/2 + low)
-            if (this.table.get_newest_value(column[mid], index) > value):
+            if (self.table.get_newest_value(column[mid], index) > value):
                 high = mid - 1;
-            elif (this.table.get_newest_value(column[mid], index) == value):
+            elif (self.table.get_newest_value(column[mid], index) == value):
                 records.append(value)
                 high - mid - 1;
             else:
@@ -83,8 +85,11 @@ class Index:
     # Returns the RIDs of all records with values in column "column" between "begin" and "end"
     """
 
-    def locate_range(self, begin, end, index = this.table.primary_key_column):
-        column = this.indices[index]
+    def locate_range(self, begin, end, index = -1):
+        if (index == -1):
+            column = self.indices[self.table.primary_key_column]
+        else:
+            column = self.indices[index]
         startIndex = -1
         endIndex = -1
         low = 0
@@ -93,9 +98,9 @@ class Index:
 
         while (low <= high):
             mid = int((high-low)/2 + low)
-            if (this.table.get_newest_value(column[mid], index) > begin):
+            if (self.table.get_newest_value(column[mid], index) > begin):
                 high = mid - 1;
-            elif (this.table.get_newest_value(column[mid], index) == begin):
+            elif (self.table.get_newest_value(column[mid], index) == begin):
                 startIndex = mid;
                 high = mid - 1;
             else:
@@ -105,9 +110,9 @@ class Index:
         high = len(column)
         while (low <= high):
             mid = int((high-low)/2 + low)
-            if (this.table.get_newest_value(column[mid], index) > end):
+            if (self.table.get_newest_value(column[mid], index) > end):
                 high = mid - 1;
-            elif (this.table.get_newest_value(column[mid], index) == end):
+            elif (self.table.get_newest_value(column[mid], index) == end):
                 endIndex = mid;
                 low = mid + 1;
             else:
