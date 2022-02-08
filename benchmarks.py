@@ -1,5 +1,5 @@
-from db import Database
-from query import Query
+from lstore.db import Database
+from lstore.query import Query
 from time import process_time
 from random import choice, randrange
 
@@ -34,8 +34,8 @@ print("Updating 10k records took:  \t\t\t", update_time_1 - update_time_0)
 
 # # Measuring Select Performance
 select_time_0 = process_time()
-for i in range(0, 100):
-    print(query.select(choice(keys),0 , [1, 1, 1, 1, 1]))
+for i in range(0, 10000):
+    query.select(choice(keys),0 , [1, 1, 1, 1, 1])
     
 
 select_time_1 = process_time()
@@ -47,7 +47,6 @@ for i in range(0, 10000, 100):
     start_value = 906659671 + i
     end_value = start_value + 100
     result = query.sum(start_value, end_value - 1, randrange(0, 5))
-    print(result)
 agg_time_1 = process_time()
 print("Aggregate 10k of 100 record batch took:\t", agg_time_1 - agg_time_0)
 

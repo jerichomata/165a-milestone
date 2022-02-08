@@ -25,19 +25,10 @@ class Query:
     def delete(self, primary_key):
         if(primary_key in self.keys):
             self.table.delete_record(primary_key)
+            self.keys.remove(primary_key)
             return True
         return False
 
-    """
-    # generates new key
-    """
-
-    def get_key(self):
-        if(self.keys):
-            self.keys.append(self.keys[-1] += 1)
-            return self.keys[-1]
-        self.keys.append(1)
-        return self.keys[-1] 
     
     """
     # Insert a record with specified columns
@@ -46,7 +37,9 @@ class Query:
     """
 
     def insert(self, *columns):
-        new_record = Record(self.table.get_rid(), self.get_key(), columns)
+        columns =  list(columns)
+        new_record = Record(self.table.get_new_rid(), columns[self.table.primary_key_column-4], columns)
+        self.keys.append(columns[self.table.primary_key_column])
         self.table.add_record(new_record)
         return True
 
@@ -62,10 +55,16 @@ class Query:
 
     def select(self, index_value, index_column, query_columns):
         records_objects = []
-        for i in range(0, len(query_columns)):
-            if(query_columns[i] == 1):
-                records_objects.append(self.table.get_newest_value(self.table.index.locate(index_column, index_value)))
-            index_column += 4
+        locations = self.table.index.locate(index_value, index_column+4)
+        for location in locations:
+            columns = []
+            for i, column in enumerate(query_columns):
+                if(column == 1):
+                    columns.append(self.table.get_newest_value(location, i+4))
+                else:
+                    columns.append(None)
+            new_record = Record(location, columns[self.table.primary_key_column-4], columns)
+            records_objects.append(new_record)
         return records_objects
         
     """
@@ -76,9 +75,16 @@ class Query:
 
     def update(self, primary_key, *columns):
         if(primary_key in self.keys):
-            rid = self.table.get_rid()
-            new_record = Record(rid, primary_key, columns)
-            self.table.update_record(new_record, rid)
+            base_rid = self.table.index.locate(primary_key)
+            if base_rid is None:
+                return False
+            else:
+                base_rid = base_rid[0]
+            
+            rid = self.table.get_new_rid()
+            new_record = Record(rid, primary_key, list(columns))
+            self.table.update_record(new_record, base_rid)
+
             return True
         return False
             
@@ -97,8 +103,8 @@ class Query:
         rids = self.table.index.locate_range(start_range, end_range)
         if(rids):
             for rid in rids:
-                sum += self.table.get_newest_value(rid, aggregate_column_index)
-            return True
+                sum += self.table.get_newest_value(rid, aggregate_column_index+4)
+            return sum
         return False
 
     """
