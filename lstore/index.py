@@ -30,39 +30,30 @@ class Index:
         
         if (len(self.indices[0]) == 1):
             for i in range(self.table.num_columns):
-                if (self.indices[i][0] < record.columns[i]):
+                if (self.table.get_newest_value(self.indices[i][0], i) < record.columns[i]):
                     self.indices[i].append(base_rid)
                 else:
                     self.indices[i].insert(0, base_rid)
             return
-        print(record.columns)
 
         for i, index in enumerate(self.indices):
-            low = 0
-            high = len(self.indices[i])-1
-            mid = 0
-            comparison = 0
-            while (low < high):
-                mid = int((low+high)//2)
-                comparison = cmp(record.columns[i], self.table.get_newest_value(self.indices[i][mid], i))
-                if (comparison > 0):
-                    low = mid + 1
-                elif(comparison < 0):
-                    high = mid - 1
-                else:
-                    mid + 1
-                    break
-            
-            if(comparison == 0):
-                self.indices[i].insert(mid, base_rid)
-            elif(comparison > 0):
-                self.indices[i].insert(low+1, base_rid)
-            elif(comparison < 0):
-                self.indices[i].insert(low, base_rid)
-        self.print_keys(self.table.primary_key_column)
+            #loc to insert
+            location = self.find_insert_location(self.indices[i], record.columns[i], i)
+            self.indices[i].insert(location, base_rid)
                 
 
-            
+    def find_insert_location(self, column, value, index):
+        low = 0
+        high = len(column)-1
+        while (low <= high):
+            mid = low + (high - low) // 2
+            if (value == self.table.get_newest_value(column[mid], index)):
+                return mid + 1
+            elif (value > self.table.get_newest_value(column[mid], index)):
+                low = mid + 1
+            else:
+                high = mid - 1
+        return low
         
 
     def drop_record(self, rid):
