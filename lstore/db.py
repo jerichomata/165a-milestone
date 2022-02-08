@@ -1,5 +1,5 @@
 from asyncio.windows_events import NULL
-from table import Table
+from lstore.table import Table
 
 class Database():
 

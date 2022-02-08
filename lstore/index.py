@@ -74,7 +74,7 @@ class Index:
 
     def locate(self, value, index = -1):
         if (index == -1):
-            index = self.table.primary_key_column
+            index = self.table.primary_key_column_hidden
             
         column = self.indices[index]
         records = []
@@ -112,46 +112,71 @@ class Index:
 
     def locate_range(self, begin, end, index = -1):
         if (index == -1):
-            index = self.table.primary_key_column
-            
+            index = self.table.primary_key_column_hidden  
         column = self.indices[index]
-        start_index = -1
-        end_index = -1
-        low = 0
-        high = len(column)-1
-        #Uses Binary Search to the first index to cut the list.
 
-        while (low <= high):
-            mid = int((low+high)//2)
-            if (self.table.get_newest_value(column[mid], index) > begin):
-                high = mid - 1
-            elif (self.table.get_newest_value(column[mid], index) == begin):
-                start_index = mid
-                while(self.table.get_newest_value(column[start_index], index) == begin and start_index > low):
-                    start_index-=1
-                break
-            else:
-                low = mid + 1
-        #Uses Binary search again to find end_index
-        low = 0
-        high = len(column)-1
-        while (low <= high):
-            mid = int((low+high)//2)
-            if (self.table.get_newest_value(column[mid], index) > end):
-                high = mid - 1
-            elif (self.table.get_newest_value(column[mid], index) == end):
-                end_index = mid
-                while(self.table.get_newest_value(column[end_index], index) == end and end_index < high):
-                    end_index+=1
-                break
-            else:
-                low = mid + 1
+        start_index = self.first(column, begin, index, len(column))
+        end_index = self.last(column, end, index, len(column))+1
+
         if(start_index == -1 or end_index == -1):
             print("locate_range: Could not find value in list.")
-            print(str(begin) + " " + str(end))
             return None
+            
         else:
-            return (column[start_index+1:end_index])
+            return((column[start_index:end_index]))
+    """
+    # Find first occurence in column
+    """
+
+    def first(self, column, value, index, n):
+        
+        low = 0
+        high = n - 1
+        res = -1
+        
+        while (low <= high):
+            
+            # Normal Binary Search Logic
+            mid = (low + high) // 2
+            
+            if self.table.get_newest_value(column[mid],index) > value:
+                high = mid - 1
+            elif self.table.get_newest_value(column[mid],index) < value:
+                low = mid + 1
+                
+            # If arr[mid] is same as x, we
+            # update res and move to the left
+            # half.
+            else:
+                res = mid
+                high = mid - 1
+    
+        return res
+    
+
+    def last(self, column, value, index, n):
+        low = 0
+        high = n - 1
+        res = -1
+        
+        while(low <= high):
+            
+            # Normal Binary Search Logic
+            mid = (low + high) // 2
+            
+            if self.table.get_newest_value(column[mid],index) > value:
+                high = mid - 1
+            elif self.table.get_newest_value(column[mid],index) < value:
+                low = mid + 1
+                
+            # If arr[mid] is same as x, we
+            # update res and move to the Right
+            # half.
+            else:
+                res = mid
+                low = mid + 1
+    
+        return res
 
     """
     # optional: Create index on specific column

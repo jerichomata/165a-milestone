@@ -47,8 +47,8 @@ for key in records:
         print('select error on', key, ':', record, ', correct:', records[key])
     else:
         pass
-        # print('select on', key, ':', record)
-
+        # print('select on', key, ':', record.columns)
+print("Select finished")
 for key in records:
     updated_columns = [None, None, None, None, None]
     for i in range(2, grades_table.num_columns):
@@ -66,12 +66,12 @@ for key in records:
             if column != records[key][j]:
                 error = True
         if error:
-            print('update error on', original, 'and', updated_columns, ':', record, ', correct:', records[key])
+            print('update error on', original, 'and', updated_columns, ':', record.columns, ', correct:', records[key])
         else:
             pass
             # print('update on', original, 'and', updated_columns, ':', record)
         updated_columns[i] = None
-
+print("Update finished")
 keys = sorted(list(records.keys()))
 # aggregate on every column 
 for c in range(0, grades_table.num_columns):
@@ -85,3 +85,4 @@ for c in range(0, grades_table.num_columns):
         else:
             pass
             # print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
+print("Sum finished")

@@ -1,5 +1,5 @@
-from table import Table, Record
-from index import Index
+from lstore.table import Table, Record
+from lstore.index import Index
 
 
 class Query:
@@ -39,7 +39,7 @@ class Query:
     def insert(self, *columns):
         columns =  list(columns)
         new_record = Record(self.table.get_new_rid(), columns[self.table.primary_key_column-4], columns)
-        self.keys.append(columns[self.table.primary_key_column-4])
+        self.keys.append(columns[self.table.primary_key_column])
         self.table.add_record(new_record)
         return True
 
@@ -55,13 +55,16 @@ class Query:
 
     def select(self, index_value, index_column, query_columns):
         records_objects = []
-        for i in range(0, len(query_columns)):
-            if(query_columns[i] == 1):
-                location = self.table.index.locate(index_value, index_column+4)
-                if(location is not None):
-                    records_objects.append(self.table.get_newest_value(location[0], i+4))
+        locations = self.table.index.locate(index_value, index_column+4)
+        for location in locations:
+            columns = []
+            for i, column in enumerate(query_columns):
+                if(column == 1):
+                    columns.append(self.table.get_newest_value(location, i+4))
                 else:
-                    return False
+                    columns.append(None)
+            new_record = Record(location, columns[self.table.primary_key_column-4], columns)
+            records_objects.append(new_record)
         return records_objects
         
     """
@@ -100,8 +103,8 @@ class Query:
         rids = self.table.index.locate_range(start_range, end_range)
         if(rids):
             for rid in rids:
-                sum += self.table.get_newest_value(rid, aggregate_column_index)
-            return True
+                sum += self.table.get_newest_value(rid, aggregate_column_index+4)
+            return sum
         return False
 
     """
