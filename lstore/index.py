@@ -23,13 +23,13 @@ class Index:
 
     def sorted_insert(self, record, base_rid):
         if (not self.indices):
-            for i in range(self.table.num_columns):
+            for i in range(self.table.num_columns_hidden):
                 temp_list = [base_rid]
                 self.indices.append(temp_list)
             return
         
         if (len(self.indices[0]) == 1):
-            for i in range(self.table.num_columns):
+            for i in range(self.table.num_columns_hidden):
                 if (self.table.get_newest_value(self.indices[i][0], i) < record.columns[i]):
                     self.indices[i].append(base_rid)
                 else:
@@ -75,7 +75,6 @@ class Index:
     def locate(self, value, index = -1):
         if (index == -1):
             index = self.table.primary_key_column_hidden
-            
         column = self.indices[index]
         records = []
         low = 0

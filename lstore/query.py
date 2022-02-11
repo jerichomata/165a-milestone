@@ -38,7 +38,7 @@ class Query:
 
     def insert(self, *columns):
         columns =  list(columns)
-        new_record = Record(self.table.get_new_rid(), columns[self.table.primary_key_column-4], columns)
+        new_record = Record(self.table.get_new_rid(), columns[self.table.primary_key_column], columns)
         self.keys.append(columns[self.table.primary_key_column])
         self.table.add_record(new_record)
         return True
@@ -63,7 +63,7 @@ class Query:
                     columns.append(self.table.get_newest_value(location, i+4))
                 else:
                     columns.append(None)
-            new_record = Record(location, columns[self.table.primary_key_column-4], columns)
+            new_record = Record(location, columns[self.table.primary_key_column], columns)
             records_objects.append(new_record)
         return records_objects
         
