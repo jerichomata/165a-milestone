@@ -25,3 +25,11 @@ class bufferpool:
 
     def unpin_page(self, page):
         self.pinned_pages.remove(page)
+
+    #add page to bufferpool because it has been read, updated, or created.
+    def add_page(self, page):
+        pass
+
+    #evict page based on eviction protocal of choice. 
+    def evict_page(self, page):
+        pass
