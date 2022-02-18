@@ -1,3 +1,4 @@
+from bpool import bufferpool
 from asyncio.windows_events import NULL
 from lstore.table import Table
 
@@ -9,9 +10,13 @@ class Database():
 
     # Not required for milestone1
     def open(self, path):
+        #db needs a bufferpool now
+        bpool = bufferpool()
         pass
 
     def close(self):
+        #all changes non-commited changes must be written to disk before closure
+        self.bpool.make_clean()
         pass
 
     """

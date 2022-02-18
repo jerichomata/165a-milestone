@@ -17,7 +17,7 @@ class bufferpool:
     def mark_dirty(self, page):
         self.dirty_pages.append(page)
 
-    #push all updates and creations to "disk".
+    #push all updates to "disk".
     def make_clean(self):
         pass
 

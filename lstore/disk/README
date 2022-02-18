@@ -1,0 +1,9 @@
+Pseudo-disk functionality and architecture:
+
+Each table gets it's own directory which will be named Table_table.name()
+
+Each table directory will store that table's pages. Table pages will be label sequentially 1-n.
+Base page names will start with B, ei: B2, or B4. Tail page names will start with a T formated like before.
+
+Each page will be represented by a txt file containg the # of records in the first line of the file and on the second line,
+the byte array which contains the column data.
