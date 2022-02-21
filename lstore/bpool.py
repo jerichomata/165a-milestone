@@ -30,7 +30,7 @@ class bufferpool:
 
     def write_page_to_disk(self, page, path):
         with open(path + "\\" + page.name + ".txt", 'w') as file:
-            file.write(page.num_records + " " + page.data)
+            file.write(page.num_records + " " + page.data.decode())
 
 
     def pin_page(self, page):
@@ -41,11 +41,14 @@ class bufferpool:
 
     #add page to bufferpool because it has been read, updated, or created.
     def add_page(self, page):
+        index = len(self.bpool)
         if(self.MAX_SIZE > len(self.bpool)):
             self.bpool.append(page)
         else:
             self.evict_page()
             self.bpool.append(page)
+        return index
+        
 
     def find_page(self, table_name, prefix, page_range, column):
         cwd = os.getcwd()
@@ -58,7 +61,7 @@ class bufferpool:
             lines.split(" ")
             page_find = Page(page_type+page_range+"-"+column, table_name)
             page_find.set_num_records(lines[0])
-            page_find.set_data(lines[1])
+            page_find.set_data(bytearray(lines[1].encode()))
 
         return self.add_page(page_find)
 
