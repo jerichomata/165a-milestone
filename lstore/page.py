@@ -5,13 +5,18 @@ import struct
 
 class Page:
 
-    def __init__(self, name, table):
+    def __init__(self, name, table_name):
         self.name = name
-        self.table = table
+        self.table_name = table_name
         self.num_records = 0
         self.data = bytearray(4096)
 
+    def set_num_records(self, value):
+        self.num_records = value
 
+    def set_data(self, data):
+        self.data = data
+    
     def has_capacity(self):
         if(self.num_records * 8 < len(self.data)):
             return True

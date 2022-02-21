@@ -1,3 +1,5 @@
+from imp import acquire_lock, release_lock
+from lstore import Page
 import time
 import os
 
@@ -5,10 +7,9 @@ class bufferpool:
 
     #intialize a 3x5 bufferpool, this is an arbitrary size. 
     def __init__(self):
-        MAX_HEIGHT = 3
-        MAX_WIDTH = 5
+        MAX_SIZE = 5
         #bufferpool that stores tuple ( page, time_accessed ).
-        self.bpool = [[],[],[]]
+        self.bpool = []
 
         #both lists because bufferpool is so small that inefficent searching algorithms don't matter.
         self.pinned_pages = []
@@ -40,12 +41,28 @@ class bufferpool:
 
     #add page to bufferpool because it has been read, updated, or created.
     def add_page(self, page):
-        for i, row in enumerate(self.bpool):
-            if len(row) < 5:
-                row.append(page, time.time())
-            elif i == 2:
-                self.evict_page()
-                self.add_page(page)  
+        if(self.MAX_SIZE > len(self.bpool)):
+            self.bpool.append(page)
+        else:
+            self.evict_page()
+            self.bpool.append(page)
+
+    def find_page(self, table_name, prefix, page_range, column):
+        cwd = os.getcwd()
+        page_type = "B"
+        if(not prefix):
+            page_type = "T"
+        
+        with open(cwd + "\\disk\\" + table_name + "\\" + page_type + page_range + "-" + column, 'r') as file:
+            lines = file.readline()
+            lines.split(" ")
+            page_find = Page(page_type+page_range+"-"+column, table_name)
+            page_find.set_num_records(lines[0])
+            page_find.set_data(lines[1])
+
+        return self.add_page(page_find)
+
+        
 
 
     #helper function for sort below.
