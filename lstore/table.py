@@ -3,6 +3,8 @@ from lstore.index import Index
 from lstore.page import Page
 from time import time
 
+import os
+
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
 TIMESTAMP_COLUMN = 2
@@ -192,3 +194,16 @@ class Table:
     def __merge(self):
         print("merge is happening")
         pass
+
+    # reads all base pages from disk and stores it into a list of base pages
+    def __merge_storeBasePage(self, table_name, page_range, column):
+        cwd = os.getcwd()
+        page_type = 'B'
+        with open(cwd + "\\disk\\" + table_name + "\\" + page_type + page_range + "-" + column, 'r') as file:
+            lines = file.readlines()
+            for lines in file:
+                lines.split(" ")
+                page_find = Page(page_type+page_range+"-"+column, table_name)
+                page_find.set_num_records(lines[0])
+                page_find.set_data(lines[1])
+        return lines
