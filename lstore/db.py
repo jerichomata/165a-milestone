@@ -11,7 +11,7 @@ class Database():
     # Not required for milestone1
     def open(self, path):
         #db needs a bufferpool now
-        bpool = bufferpool()
+        self.bpool = bufferpool()
         pass
 
     def close(self):
@@ -26,7 +26,7 @@ class Database():
     :param key: int             #Index of table key in columns
     """
     def create_table(self, name, num_columns, key_index):
-        table = Table(name, num_columns, key_index)
+        table = Table(name, num_columns, key_index, self.bpool)
         return table
 
     """

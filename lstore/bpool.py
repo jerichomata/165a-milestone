@@ -1,4 +1,5 @@
 import time
+import os
 
 class bufferpool:
 
@@ -7,11 +8,11 @@ class bufferpool:
         MAX_HEIGHT = 3
         MAX_WIDTH = 5
         #bufferpool that stores tuple ( page, time_accessed ).
-        bpool = [[],[],[]]
+        self.bpool = [[],[],[]]
 
         #both lists because bufferpool is so small that inefficent searching algorithms don't matter.
-        pinned_pages = []
-        dirty_pages = []
+        self.pinned_pages = []
+        self.dirty_pages = []
 
     #mark this page as dirty if it has been updated or recently created and not put to "disk".
     def mark_dirty(self, page):
@@ -19,7 +20,17 @@ class bufferpool:
 
     #push all updates to "disk".
     def make_clean(self):
-        pass
+        for i, page in enumerate(self.dirty_pages):
+            cwd = os.getcwd()
+            path = cwd + "\\disk\\" + page.table
+            os.mkdir(path)
+            self.write_page_to_disk(page, path)
+            self.dirty_pages.remove(page)
+
+    def write_page_to_disk(self, page, path):
+        with open(path + "\\" + page.name + ".txt", 'w') as file:
+            file.write(page.num_records + " " + page.data)
+
 
     def pin_page(self, page):
         self.pinned_pages.append(page)
@@ -46,7 +57,8 @@ class bufferpool:
         pages = []
 
         #before any pages can be evicted we must make all pages clean so that no uncommited changes are lost.
-        self.make_clean()
+        if not self.dirty_pages:
+            self.make_clean()
 
         #loop through bpool and sort the pages by recent usage, find the least recently used page that is unpinned and evict.
         #if all pages are pinned, (for whatever reason), return error code/msg.

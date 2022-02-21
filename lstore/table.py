@@ -35,7 +35,7 @@ class Table:
     base_pages: list of base pages
     tail_pages: list of tail pages
     """
-    def __init__(self, name, num_columns, key):
+    def __init__(self, name, num_columns, key, bpool):
         self.name = name
         self.primary_key_column = key
         self.primary_key_column_hidden = key + 4
@@ -47,6 +47,7 @@ class Table:
         self.base_pages = []
         self.tail_pages = []
         self.index = Index(self)
+        self.bpool = bpool
         pass
 
     def get_base_rid(self, rid):
@@ -101,7 +102,7 @@ class Table:
 
         if len(self.base_pages) == 0:
             for i in range(self.num_columns_hidden):
-                self.base_pages.append(Page())
+                self.base_pages.append(Page(self.name, "B" + str((len(self.base_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.base_pages)%self.num_columns_hidden)))
 
 
         if self.base_pages[len(self.base_pages)-1].has_capacity():
@@ -110,7 +111,7 @@ class Table:
                 self.base_pages[index].write(record.columns[self.num_columns_hidden-j])
         else:
             for j in range(self.num_columns_hidden):
-                page = Page()
+                page = Page(self.name, "B" + str((len(self.base_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.base_pages)%self.num_columns_hidden))
                 page.write(record.columns[j])
                 self.base_pages.append(page)
             index = len(self.base_pages)-1
@@ -157,7 +158,7 @@ class Table:
 
         if len(self.tail_pages) == 0:
             for i in range(self.num_columns_hidden):
-                self.tail_pages.append(Page())
+                self.tail_pages.append(Page(self.name, "T" + str((len(self.tail_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.tail_pages)%self.num_columns_hidden)))
         
         if self.tail_pages[len(self.tail_pages)-1].has_capacity():
             for j in range(self.num_columns_hidden,0,-1):
@@ -165,7 +166,7 @@ class Table:
                 self.tail_pages[index].write(record.columns[self.num_columns_hidden-j])
         else:
             for j in range(self.num_columns_hidden):
-                page = Page()
+                page = Page(self.name, "T" + str((len(self.tail_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.tail_pages)%self.num_columns_hidden))
                 page.write(record.columns[j])
                 self.tail_pages.append(page)
             index = len(self.tail_pages)-1

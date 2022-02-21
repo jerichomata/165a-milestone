@@ -5,7 +5,9 @@ import struct
 
 class Page:
 
-    def __init__(self):
+    def __init__(self, name, table):
+        self.name = name
+        self.table = table
         self.num_records = 0
         self.data = bytearray(4096)
 
