@@ -41,14 +41,23 @@ class bufferpool:
 
     #add page to bufferpool because it has been read, updated, or created.
     def add_page(self, page):
-        index = len(self.bpool)
-        if(self.MAX_SIZE > len(self.bpool)):
-            self.bpool.append(page)
+
+        if(self.exist_in_bpool(page) != -1):
+            index = self.exist_in_bpool(page)
         else:
-            self.evict_page()
-            self.bpool.append(page)
+            index = len(self.bpool)
+            if(self.MAX_SIZE > len(self.bpool)):
+                self.bpool.append(page)
+            else:
+                self.evict_page()
+                self.bpool.append(page)
         return index
         
+    def exist_in_bpool(self, page):
+        for i in self.bpool:
+            if i.get_name() == page.get_name():
+                return i
+        return -1
 
     def find_page(self, table_name, prefix, page_range, column):
         cwd = os.getcwd()
