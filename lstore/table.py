@@ -44,8 +44,8 @@ class Table:
         self.current_rid = 1
         self.num_records = 0
         self.page_directory = {}
-        self.base_pages = []
-        self.tail_pages = []
+        self.base_page_ranges = 0
+        self.tail_page_ranges = 0
         self.index = Index(self)
         self.bpool = bpool
         pass
@@ -80,22 +80,17 @@ class Table:
 
 
     def get_value(self, rid, column):
-        base, offset = self.page_directory[rid]
-        if base:
-            index = self.bpool.find_page(self.name, True, self.page_directory[rid][1] , column).read(offset)
-            return self.bpool.bpool[index]
-        else:
-            index = self.bpool.find_page(self.name, False, self.page_directory[rid][1] , column).read(offset)
-            return self.bpool.bpool[index]
+        location = self.page_directory[rid]
+
+        index = self.bpool.find_page(self.name, location[0], location[1] , column)
+        return self.bpool.bpool[index].read(location[2])
 
     def set_value(self, value, rid, column):
-        base, offset = self.page_directory[rid]
-        if base:
-            index = self.bpool.find_page(self.name, True, self.page_directory[rid][1] , column).set_value(value, offset)
-            return self.bpool.bpool[index]
-        else:
-            index = self.bpool.find_page(self.name, False, self.page_directory[rid][1] , column).set_value(value, offset)
-            return self.bpool.bpool[index]
+        location = self.page_directory[rid]
+
+        index = self.bpool.find_page(self.name, location[0], location[1] , column)
+        self.bpool.bpool[index].set_value(value, location[2])
+
 
     def is_base(self, rid):
         return self.page_directory[rid][0]
@@ -109,24 +104,24 @@ class Table:
         if len(self.base_pages) == 0:
             for i in range(self.num_columns_hidden):
                 #self.base_pages.append(Page(self.name, "B" + str((len(self.base_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.base_pages)%self.num_columns_hidden)))
-                self.bpool.add_page(Page(self.name, "B" + str((len(self.base_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.base_pages)%self.num_columns_hidden)))
+                self.bpool.add_page(Page(self.name, "B" + str((self.base_page_ranges//self.num_columns_hidden) + 1) + "-" + str(self.base_page_ranges%self.num_columns_hidden)))
+            self.base_page_ranges = 1
 
-        if self.base_pages[len(self.base_pages)-1].has_capacity():
-            for j in range(self.num_columns_hidden,0,-1):
-                index = len(self.base_pages)-j
-                self.base_pages[index].write(record.columns[self.num_columns_hidden-j])
+        index = self.bpool.find_page(self.name, True, self.base_page_ranges, 0)
+        if self.bpool.bpool[index].has_capacity():
+            for j in range(self.num_columns_hidden):
+                current_index = self.bpool.find_page(self.name, True, self.base_page_ranges, j)
+                self.bpool.bpool[current_index].write(record.columns[j])
         else:
             for j in range(self.num_columns_hidden):
-                page = Page(self.name, "B" + str((len(self.base_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.base_pages)%self.num_columns_hidden))
+                page = Page(self.name, "B" + str((self.base_page_ranges//self.num_columns_hidden) + 1) + "-" + str(self.base_page_ranges%self.num_columns_hidden))
                 page.write(record.columns[j])
-                #self.base_pages.append(page)
-                self.bpool.add_page(page)
-            index = len(self.base_pages)-1
+                index = self.bpool.add_page(page)
+            self.base_page_ranges += 1
 
-        page_number = (len(self.base_pages)/self.num_columns_hidden) - 1
-        offset = self.base_pages[index].num_records - 1
+        offset = self.bpool.bpool[index].num_records - 1
 
-        self.page_directory[record.rid] = [True, int(page_number), offset]
+        self.page_directory[record.rid] = [True, self.base_page_ranges, offset]
         self.index.sorted_insert(record, record.rid)
 
 
