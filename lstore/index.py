@@ -23,23 +23,19 @@ class Index:
 
     def sorted_insert(self, record, base_rid):
         if (not self.indices):
-            for i in range(self.table.num_columns_hidden):
-                temp_list = [base_rid]
-                self.indices.append(temp_list)
+            self.indices.append(base_rid)
             return
         
-        if (len(self.indices[0]) == 1):
-            for i in range(self.table.num_columns_hidden):
-                if (self.table.get_newest_value(self.indices[i][0], i) < record.columns[i]):
-                    self.indices[i].append(base_rid)
-                else:
-                    self.indices[i].insert(0, base_rid)
+        if (len(self.indices) == 1):
+            if (self.table.get_newest_value(self.indices[0], self.table.primary_key_column_hidden) < record.columns[self.table.primary_key_column_hidden]):
+                self.indices.append(base_rid)
+            else:
+                self.indices.insert(0, base_rid)
             return
 
-        for i, index in enumerate(self.indices):
             #loc to insert
-            location = self.find_insert_location(self.indices[i], record.columns[i], i)
-            self.indices[i].insert(location, base_rid)
+        location = self.find_insert_location(self.indices, record.columns[self.table.primary_key_column_hidden], self.table.primary_key_column_hidden)
+        self.indices.insert(location, base_rid)
                 
 
     def find_insert_location(self, column, value, index):
@@ -57,8 +53,7 @@ class Index:
         
 
     def drop_record(self, rid):
-        for i in range(len(self.indices)):
-            self.indices[i].remove(rid)
+        self.indices.remove(rid)
 
     def update(self, record, base_rid):
         self.drop_record(base_rid)
@@ -75,7 +70,7 @@ class Index:
     def locate(self, value, index = -1):
         if (index == -1):
             index = self.table.primary_key_column_hidden
-        column = self.indices[index]
+        column = self.indices
         records = []
         low = 0
         high = len(column)-1
@@ -112,7 +107,7 @@ class Index:
     def locate_range(self, begin, end, index = -1):
         if (index == -1):
             index = self.table.primary_key_column_hidden  
-        column = self.indices[index]
+        column = self.indices
 
         start_index = self.first(column, begin, index, len(column))
         end_index = self.last(column, end, index, len(column))+1
