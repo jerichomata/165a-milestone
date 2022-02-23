@@ -183,9 +183,7 @@ class Table:
                 page = Page(self.name, "T" + str(self.tail_page_ranges//self.num_columns_hidden) + 1) + "-" + str(self.tail_page_ranges%self.num_columns_hidden)
                 #-----
                 page.write(record.columns[j])
-                self.bpool.add_page(page)
-            #index = len(self.tail_pages)-1
-            index = self.tail_page_ranges-1
+                index=self.bpool.add_page(page)
             #-----
 
         #page_number = (len(self.tail_pages)/self.num_columns_hidden) - 1
