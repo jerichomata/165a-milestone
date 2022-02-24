@@ -8,7 +8,7 @@ class bufferpool:
 
     #intialize a 3x5 bufferpool, this is an arbitrary size. 
     def __init__(self):
-        self.MAX_SIZE = 15
+        self.MAX_SIZE = 20
         #bufferpool that stores tuple ( page, time_accessed ).
         self.bpool = []
         self.path = []
@@ -38,8 +38,6 @@ class bufferpool:
             num_records = bytearray(8)
             num_records[0:8] = struct.pack('Q', page.num_records)
             file.write(num_records + page.data)
-            print(page.name)
-            print(page.data)
 
 
     def pin_page(self, index):
@@ -47,7 +45,10 @@ class bufferpool:
             self.pinned_pages.append(self.bpool[index])
 
     def unpin_page(self, index):
-        self.pinned_pages.remove(self.bpool[index])
+        try:
+            self.pinned_pages.remove(self.bpool[index])
+        except:
+            pass
 
 
     #add page to bufferpool because it has been read, updated, or created.
@@ -55,11 +56,11 @@ class bufferpool:
 
         index = len(self.bpool)
         if(self.MAX_SIZE > len(self.bpool)):
-            self.bpool.append((page,time.time()))
+            self.bpool.append([page,time.time()])
         else:
             self.evict_page()
             index = len(self.bpool)
-            self.bpool.append((page,time.time()))
+            self.bpool.append([page,time.time()])
         return index
         
     def exist_in_bpool(self, page_type, page_range, column):
@@ -79,10 +80,11 @@ class bufferpool:
         exist_index = self.exist_in_bpool(page_type, page_range, column)
 
         if(exist_index > -1):
+            self.bpool[exist_index][1] = time.time()
             return exist_index
 
         with open(cwd + "\lstore\disk\\" + table_name + "\\" + page_type + str(page_range) + "-" + str(column), 'rb') as file:
-            lines = file.readline()
+            lines = file.read(5004)
             page_find = Page(page_type + str(page_range) + "-" + str(column), table_name)
             page_find.set_num_records(struct.unpack('Q', lines[0:8])[0])
             page_find.set_data(bytearray(lines[8:5004]))
@@ -93,9 +95,7 @@ class bufferpool:
     def evict_page(self):
 
         #before any pages can be evicted we must make all pages clean so that no uncommited changes are lost.
-        print(self.dirty_pages)
         if self.dirty_pages:
-            print("cleaned")
             self.make_clean()
  
         #loop through bpool and sort the pages by recent usage, find the least recently used page that is unpinned and evict.
@@ -108,6 +108,6 @@ class bufferpool:
         for pair in self.bpool:
             if(pair[0] not in self.pinned_pages):
                 self.bpool.remove(pair)
-                return print("page evicted.")
+                return
 
         return print("all of the pages in the bufferpool are pinned. ")    

@@ -31,8 +31,6 @@ class Page:
             value = int(value)
             self.data[self.num_records * 8: self.num_records*8 + 8] = struct.pack('Q', value)
             self.num_records += 1
-            if self.name == "B0-0":
-                print(str(self.num_records-1) + ":" + str(value))
         else:
             print("Could not write")
 
