@@ -77,12 +77,10 @@ class Table:
         if rid == 1:
             base_index = self.bpool.find_page( self.name, True, location[1] , column)
             return self.bpool.bpool[base_index][0].read(location[2])
-        try:
-        
-            index = self.bpool.find_page( self.name, self.page_directory[rid][0], location[1] ,column)
-        except:
-            print(self.bpool.bpool[base_index][0].data)
 
+        location = self.page_directory[rid]
+        index = self.bpool.find_page( self.name, False, location[1], column)
+        print(self.bpool.bpool[index][0].read(location[2]))
         return self.bpool.bpool[index][0].read(location[2])
 
 
@@ -187,10 +185,10 @@ class Table:
                 page.write(record.columns[j])
                 index = self.bpool.add_page(page)
                 self.bpool.mark_dirty(index)
+
             self.tail_page_ranges += 1
 
         offset = self.bpool.bpool[index][0].num_records - 1
-        
 
         self.page_directory[new_rid] = [False, self.tail_page_ranges-1, offset]
         self.index.update(record, base_rid)
