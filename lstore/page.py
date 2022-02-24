@@ -14,6 +14,9 @@ class Page:
     def set_num_records(self, value):
         self.num_records = value
 
+    def get_name(self):
+        return self.name
+        
     def set_data(self, data):
         self.data = data
     

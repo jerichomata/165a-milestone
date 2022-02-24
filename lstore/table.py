@@ -3,6 +3,8 @@ from lstore.index import Index
 from lstore.page import Page
 from time import time
 
+import os
+
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
 TIMESTAMP_COLUMN = 2
@@ -48,6 +50,7 @@ class Table:
         self.tail_page_ranges = 0
         self.index = Index(self)
         self.bpool = bpool
+        self.tps_list = []
         pass
 
     def get_base_rid(self, rid):
@@ -208,6 +211,49 @@ class Table:
         self.set_value(0, starting_rid, RID_COLUMN)
 
 
-    def __merge(self):
-        print("merge is happening")
-        pass
+    def merge(self, page_range):
+        tps = 0
+        base_rids = []
+        base_pages, new_page_range = self.read_base_page_range(page_range)
+
+        for i in range(base_pages[0].num_records):
+            
+            rid = base_pages[0].read[i]
+            base_rid = base_pages[1].read[i]
+            base_rids.append(base_rid)
+
+            if rid > tps:
+                tps = rid
+
+            for j in range(2, self.num_columns_hidden):
+                base_pages[j].set_value(self.get_value(rid, j), i)
+
+        self.write_base_page_range(base_pages)
+
+        for rid in base_rids:
+            self.page_directory[rid][1] = new_page_range
+
+        self.tps_list.insert(page_range-1, tps)
+
+    def write_base_page_range(self, base_pages):
+        for i, page in enumerate(base_pages):
+            cwd = os.getcwd()
+            path = cwd + "\\disk\\" + page.table
+            os.mkdir(path)
+            self.bpool.write_page_to_disk(page, path)
+
+
+    # reads all base pages from disk and stores it into a list of base pages
+    def read_base_page_range(self, page_range):
+        new_page_range = len(self.tps_list)
+        cwd = os.getcwd()
+        page_type = 'B'
+        for i in range(self.num_columns_hidden):
+            with open(cwd + "\\disk\\" + self.name + "\\" + page_type + str(page_range) + "-" + str(i) + ".txt", 'r') as file:
+                lines = file.readlines()
+                lines.split(" ")
+                page_find = Page(page_type + new_page_range + "-" + i, self.name)
+                page_find.set_num_records(lines[0])
+                page_find.set_data(lines[1])
+            
+        return page_find, new_page_range
