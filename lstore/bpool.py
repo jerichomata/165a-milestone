@@ -34,10 +34,12 @@ class bufferpool:
 
 
     def pin_page(self, page):
-        self.pinned_pages.append(page)
-
+        if not self.pinned_pages.__contains__(page):   
+            self.pinned_pages.append(page)
+    
     def unpin_page(self, page):
-        self.pinned_pages.remove(page)
+        if not self.pinned_pages.__contains__(page):   
+            self.pinned_pages.remove(page)
 
     #add page to bufferpool because it has been read, updated, or created.
     def add_page(self, page):
