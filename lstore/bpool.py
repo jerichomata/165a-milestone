@@ -21,7 +21,7 @@ class bufferpool:
 
     #push all updates to "disk".
     def make_clean(self):
-        for i, page in enumerate(self.dirty_pages):
+        for page in enumerate(self.dirty_pages):
             cwd = os.getcwd()
             path = cwd + "\\disk\\" + page.table
             os.mkdir(path)
@@ -47,15 +47,16 @@ class bufferpool:
         else:
             index = len(self.bpool)
             if(self.MAX_SIZE > len(self.bpool)):
-                self.bpool.append(page)
+                self.bpool.append((page,time()))
             else:
                 self.evict_page()
-                self.bpool.append(page)
+                self.bpool.append((page,time()))
         return index
         
     def exist_in_bpool(self, page):
         for i in self.bpool:
-            if i.get_name() == page.get_name():
+            #i is a pair containing (page, time)
+            if i[0].get_name() == page.get_name():
                 return i
         return -1
 
