@@ -91,17 +91,16 @@ class bufferpool:
 
         #loop through bpool and sort the pages by recent usage, find the least recently used page that is unpinned and evict.
         #if all pages are pinned, (for whatever reason), return error code/msg.
-        for i, row in enumerate(self.bpool):
+        for row in enumerate(self.bpool):
             for p in row:
-                #page, row #.
-                pages.append((p,i))
+                pages.append(p)
 
         pages.sort(key=self.sort_time)
 
         #find first page in pages that that is not pinned.
         for pair in pages:
             if(pair[0][0] not in self.pinned_pages):
-                self.bpool[p[1]].remove(p)
+                self.bpool.remove(p)
                 return print("page evicted.")
 
         return print("all of the pages in the bufferpool are pinned. ")    
