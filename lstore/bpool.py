@@ -75,33 +75,23 @@ class bufferpool:
 
         return self.add_page(page_find)
 
-        
-
-
-    #helper function for sort below.
-    def sort_time(pair):
-        return pair[1]
-
     #evict page based on Least Recently Used page. 
     def evict_page(self):
-        pages = []
 
         #before any pages can be evicted we must make all pages clean so that no uncommited changes are lost.
         if not self.dirty_pages:
             self.make_clean()
-
+ 
         #loop through bpool and sort the pages by recent usage, find the least recently used page that is unpinned and evict.
         #if all pages are pinned, (for whatever reason), return error code/msg.
-        for row in enumerate(self.bpool):
-            for p in row:
-                pages.append(p)
 
-        pages.sort(key=self.sort_time)
+        #since it's a tuple, we can just sort by 
+        self.bpool.sort(key = lambda x: x[1])
 
         #find first page in pages that that is not pinned.
-        for pair in pages:
-            if(pair[0][0] not in self.pinned_pages):
-                self.bpool.remove(p)
+        for pair in self.bpool:
+            if(pair[0] not in self.pinned_pages):
+                self.bpool.remove(pair)
                 return print("page evicted.")
 
         return print("all of the pages in the bufferpool are pinned. ")    
