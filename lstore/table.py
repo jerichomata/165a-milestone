@@ -46,8 +46,8 @@ class Table:
         self.current_rid = 1
         self.num_records = 0
         self.page_directory = {}
-        self.base_pages = []
-        self.tail_pages = []
+        self.base_page_ranges = 0
+        self.tail_page_ranges = 0
         self.index = Index(self)
         self.bpool = bpool
         self.tps_list = []
@@ -69,33 +69,34 @@ class Table:
 
     def get_newest_value(self, base_rid, column):
         location = self.page_directory[base_rid]
-        rid = self.base_pages[int(location[1] * self.num_columns_hidden)].read(location[2])
-        if (rid != 1):
-            location = self.page_directory[rid]
-            return self.tail_pages[int(location[1] * self.num_columns_hidden) + column].read(location[2])
-        else:
-            return self.base_pages[int(location[1] * self.num_columns_hidden) + column].read(location[2])
+
+        base_index = self.bpool.find_page( self.name, True, location[1] , INDIRECTION_COLUMN )
+        rid = self.bpool[base_index].read(location[2])
+
+        if rid == 1:
+            base_index = self.bpool.find_page( self.name, True, location[1] , column)
+            return self.bpool[base_index].read(location[2])
+
+        index = self.bpool.find_page( self.name, self.page_directory[rid][0], location[1] ,column)
+
+        return self.bpool.bpool[index].read(location[2])
 
 
     def get_value(self, rid, column):
-        base, page, offset = self.page_directory[rid]
-        if base:
-            return self.base_pages[int(page * self.num_columns_hidden) + column].read(offset)
-        else:
-            return self.tail_pages[int(page * self.num_columns_hidden) + column].read(offset)
+        location = self.page_directory[rid]
 
+        index = self.bpool.find_page(self.name, location[0], location[1] , column)
+        return self.bpool.bpool[index].read(location[2])
 
     def set_value(self, value, rid, column):
-        base, page, offset = self.page_directory[rid]
-        if base:
-            return self.base_pages[int(page * self.num_columns_hidden) + column].set_value(value, offset)
-        else:
-            return self.tail_pages[int(page * self.num_columns_hidden) + column].set_value(value, offset)
+        location = self.page_directory[rid]
+
+        index = self.bpool.find_page(self.name, location[0], location[1] , column)
+        self.bpool.bpool[index].set_value(value, location[2])
 
 
     def is_base(self, rid):
         return self.page_directory[rid][0]
-
 
     def add_record(self, record):
         record.columns.insert(INDIRECTION_COLUMN, 1)
@@ -103,26 +104,28 @@ class Table:
         record.columns.insert(TIMESTAMP_COLUMN, time())
         record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
 
-        if len(self.base_pages) == 0:
+        #changed from len(base_pages) 
+        if self.base_page_ranges == 0:
             for i in range(self.num_columns_hidden):
-                self.base_pages.append(Page(self.name, "B" + str((len(self.base_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.base_pages)%self.num_columns_hidden)))
+                #self.base_pages.append(Page(self.name, "B" + str((len(self.base_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.base_pages)%self.num_columns_hidden)))
+                self.bpool.add_page(Page(self.name, "B" + str((self.base_page_ranges//self.num_columns_hidden) + 1) + "-" + str(self.base_page_ranges%self.num_columns_hidden)))
+            self.base_page_ranges = 1
 
-
-        if self.base_pages[len(self.base_pages)-1].has_capacity():
-            for j in range(self.num_columns_hidden,0,-1):
-                index = len(self.base_pages)-j
-                self.base_pages[index].write(record.columns[self.num_columns_hidden-j])
+        index = self.bpool.find_page(self.name, True, self.base_page_ranges, 0)
+        if self.bpool.bpool[index].has_capacity():
+            for j in range(self.num_columns_hidden):
+                current_index = self.bpool.find_page(self.name, True, self.base_page_ranges, j)
+                self.bpool.bpool[current_index].write(record.columns[j])
         else:
             for j in range(self.num_columns_hidden):
-                page = Page(self.name, "B" + str((len(self.base_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.base_pages)%self.num_columns_hidden))
+                page = Page(self.name, "B" + str((self.base_page_ranges//self.num_columns_hidden) + 1) + "-" + str(self.base_page_ranges%self.num_columns_hidden))
                 page.write(record.columns[j])
-                self.base_pages.append(page)
-            index = len(self.base_pages)-1
+                index = self.bpool.add_page(page)
+            self.base_page_ranges += 1
 
-        page_number = (len(self.base_pages)/self.num_columns_hidden) - 1
-        offset = self.base_pages[index].num_records - 1
+        offset = self.bpool.bpool[index].num_records - 1
 
-        self.page_directory[record.rid] = [True, int(page_number), offset]
+        self.page_directory[record.rid] = [True, self.base_page_ranges, offset]
         self.index.sorted_insert(record, record.rid)
 
 
@@ -159,23 +162,39 @@ class Table:
         #Set indirection column on base page to point to this record.
         self.set_value(new_rid, base_rid, INDIRECTION_COLUMN)
 
-        if len(self.tail_pages) == 0:
+        #changed from len(base_pages) 
+        if self.tail_page_ranges == 0:
             for i in range(self.num_columns_hidden):
-                self.tail_pages.append(Page(self.name, "T" + str((len(self.tail_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.tail_pages)%self.num_columns_hidden)))
+                #self.tail_pages.append(Page(self.name, "T" + str((len(self.tail_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.tail_pages)%self.num_columns_hidden)))
+                self.bpool.add_page(self.name, "T" + str((len(self.tail_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.tail_pages)%self.num_columns_hidden))
         
-        if self.tail_pages[len(self.tail_pages)-1].has_capacity():
+        #if self.tail_pages[len(self.tail_pages)-1].has_capacity():
+        index = self.bpool.find_page(self.name, False, self.tail_page_ranges, self.num_columns_hidden)
+        if self.bpool.bpool[index].has_capacity():
+        #-----    
             for j in range(self.num_columns_hidden,0,-1):
-                index = len(self.tail_pages)-j
-                self.tail_pages[index].write(record.columns[self.num_columns_hidden-j])
+                #index = len(self.tail_pages)-j
+                #self.tail_pages[index].write(record.columns[self.num_columns_hidden-j])
+                current_index = self.bpool.find_page(self.name, True, self.base_page_ranges, j)
+                self.bpool.bpool[current_index].write(record.columns[j])
+                #-----
+
+
         else:
             for j in range(self.num_columns_hidden):
-                page = Page(self.name, "T" + str((len(self.tail_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.tail_pages)%self.num_columns_hidden))
+                #page = Page(self.name, "T" + str((len(self.tail_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.tail_pages)%self.num_columns_hidden))
+                page = Page(self.name, "T" + str(self.tail_page_ranges//self.num_columns_hidden) + 1) + "-" + str(self.tail_page_ranges%self.num_columns_hidden)
+                #-----
                 page.write(record.columns[j])
-                self.tail_pages.append(page)
-            index = len(self.tail_pages)-1
+                index=self.bpool.add_page(page)
+            #-----
 
-        page_number = (len(self.tail_pages)/self.num_columns_hidden) - 1
-        offset = self.tail_pages[index].num_records - 1
+        #page_number = (len(self.tail_pages)/self.num_columns_hidden) - 1
+        #offset = self.tail_pages[index].num_records - 1
+        page_number = (self.tail_page_ranges/self.num_columns_hidden) - 1
+        offset = self.bpool.bpool[index].num_records - 1
+        #-----
+        
 
         self.page_directory[new_rid] = [False, page_number, offset]
         self.index.update(record, base_rid)
