@@ -1,4 +1,4 @@
-from bpool import bufferpool
+from lstore.bpool import bufferpool
 from asyncio.windows_events import NULL
 from lstore.table import Table
 
@@ -9,7 +9,7 @@ class Database():
         pass
 
     # Not required for milestone1
-    def open(self, path):
+    def open(self):
         #db needs a bufferpool now
         self.bpool = bufferpool()
         pass

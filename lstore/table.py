@@ -71,28 +71,30 @@ class Table:
         location = self.page_directory[base_rid]
 
         base_index = self.bpool.find_page( self.name, True, location[1] , INDIRECTION_COLUMN )
-        rid = self.bpool[base_index].read(location[2])
+        rid = self.bpool.bpool[base_index][0].read(location[2])
 
         if rid == 1:
+            print(self.bpool.bpool)
             base_index = self.bpool.find_page( self.name, True, location[1] , column)
-            return self.bpool[base_index].read(location[2])
+            print(self.bpool.bpool[base_index][0])
+            return self.bpool.bpool[base_index][0].read(location[2])
 
         index = self.bpool.find_page( self.name, self.page_directory[rid][0], location[1] ,column)
 
-        return self.bpool.bpool[index].read(location[2])
+        return self.bpool.bpool[index][0].read(location[2])
 
 
     def get_value(self, rid, column):
         location = self.page_directory[rid]
 
         index = self.bpool.find_page(self.name, location[0], location[1] , column)
-        return self.bpool.bpool[index].read(location[2])
+        return self.bpool.bpool[index][0].read(location[2])
 
     def set_value(self, value, rid, column):
         location = self.page_directory[rid]
 
         index = self.bpool.find_page(self.name, location[0], location[1] , column)
-        self.bpool.bpool[index].set_value(value, location[2])
+        self.bpool.bpool[index][0].set_value(value, location[2])
 
 
     def is_base(self, rid):
@@ -108,25 +110,29 @@ class Table:
         if self.base_page_ranges == 0:
             for i in range(self.num_columns_hidden):
                 #self.base_pages.append(Page(self.name, "B" + str((len(self.base_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.base_pages)%self.num_columns_hidden)))
-                self.bpool.add_page(Page(self.name, "B" + str((self.base_page_ranges//self.num_columns_hidden) + 1) + "-" + str(self.base_page_ranges%self.num_columns_hidden)))
+                self.bpool.add_page(Page("B" + str(self.base_page_ranges) + "-" + str(i), self.name))
             self.base_page_ranges = 1
 
-        index = self.bpool.find_page(self.name, True, self.base_page_ranges, 0)
-        if self.bpool.bpool[index].has_capacity():
+        index = self.bpool.find_page(self.name, True, self.base_page_ranges-1, 0)
+        if self.bpool.bpool[index][0].has_capacity():
+            print('has capacity')
             for j in range(self.num_columns_hidden):
-                current_index = self.bpool.find_page(self.name, True, self.base_page_ranges, j)
-                self.bpool.bpool[current_index].write(record.columns[j])
+                current_index = self.bpool.find_page(self.name, True, self.base_page_ranges-1, j)
+                self.bpool.mark_dirty(current_index)
+                self.bpool.bpool[current_index][0].write(record.columns[j])
         else:
             for j in range(self.num_columns_hidden):
-                page = Page(self.name, "B" + str((self.base_page_ranges//self.num_columns_hidden) + 1) + "-" + str(self.base_page_ranges%self.num_columns_hidden))
+                page = Page("B" + str(self.base_page_ranges) + "-" + str(j), self.name)
                 page.write(record.columns[j])
                 index = self.bpool.add_page(page)
+                self.bpool.mark_dirty(index)
             self.base_page_ranges += 1
+            
+        offset = self.bpool.bpool[index][0].num_records - 1
 
-        offset = self.bpool.bpool[index].num_records - 1
-
-        self.page_directory[record.rid] = [True, self.base_page_ranges, offset]
+        self.page_directory[record.rid] = [True, self.base_page_ranges-1, offset]
         self.index.sorted_insert(record, record.rid)
+        print("added")
 
 
     def update_record(self, record, base_rid):
@@ -166,38 +172,33 @@ class Table:
         if self.tail_page_ranges == 0:
             for i in range(self.num_columns_hidden):
                 #self.tail_pages.append(Page(self.name, "T" + str((len(self.tail_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.tail_pages)%self.num_columns_hidden)))
-                self.bpool.add_page(self.name, "T" + str((len(self.tail_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.tail_pages)%self.num_columns_hidden))
+                self.bpool.add_page("T" + str(self.tail_page_ranges) + "-" + str(i), self.name)
         
         #if self.tail_pages[len(self.tail_pages)-1].has_capacity():
-        index = self.bpool.find_page(self.name, False, self.tail_page_ranges, self.num_columns_hidden)
-        if self.bpool.bpool[index].has_capacity():
+        index = self.bpool.find_page(self.name, False, self.tail_page_ranges, 1)
+        if self.bpool.bpool[index][0].has_capacity():
         #-----    
             for j in range(self.num_columns_hidden,0,-1):
                 #index = len(self.tail_pages)-j
                 #self.tail_pages[index].write(record.columns[self.num_columns_hidden-j])
                 current_index = self.bpool.find_page(self.name, True, self.base_page_ranges, j)
-                self.bpool.bpool[current_index].write(record.columns[j])
+                self.bpool.bpool[current_index][0].write(record.columns[j])
                 #-----
 
 
         else:
             for j in range(self.num_columns_hidden):
-                #page = Page(self.name, "T" + str((len(self.tail_pages)//self.num_columns_hidden) + 1) + "-" + str(len(self.tail_pages)%self.num_columns_hidden))
-                page = Page(self.name, "T" + str(self.tail_page_ranges//self.num_columns_hidden) + 1) + "-" + str(self.tail_page_ranges%self.num_columns_hidden)
-                #-----
+                page = Page("T" + str(self.tail_page_ranges//self.num_columns_hidden) + "-" + str(j), self.name)
                 page.write(record.columns[j])
                 index=self.bpool.add_page(page)
-            #-----
 
-        #page_number = (len(self.tail_pages)/self.num_columns_hidden) - 1
-        #offset = self.tail_pages[index].num_records - 1
         page_number = (self.tail_page_ranges/self.num_columns_hidden) - 1
-        offset = self.bpool.bpool[index].num_records - 1
-        #-----
+        offset = self.bpool.bpool[index][0].num_records - 1
         
 
         self.page_directory[new_rid] = [False, page_number, offset]
         self.index.update(record, base_rid)
+
 
     def delete_record(self, key):
         starting_rid = self.index.locate(key)[0]
