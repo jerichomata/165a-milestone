@@ -23,7 +23,7 @@ class bufferpool:
 
     #push all updates to "disk".
     def make_clean(self):
-        for page in self.dirty_pages:
+        for page in self.bpool:
             cwd = os.getcwd()
             path = cwd + "\lstore\disk\\" + page[0].table_name
             try:
@@ -31,7 +31,7 @@ class bufferpool:
             except OSError as error:
                 pass
             self.write_page_to_disk(page[0], path)
-            self.dirty_pages.remove(page)
+            # self.dirty_pages.remove(page)
 
     def write_page_to_disk(self, page, path):
         with open(path + "\\" + page.name, 'wb') as file:
@@ -95,8 +95,8 @@ class bufferpool:
     def evict_page(self):
 
         #before any pages can be evicted we must make all pages clean so that no uncommited changes are lost.
-        if self.dirty_pages:
-            self.make_clean()
+
+        self.make_clean()
  
         #loop through bpool and sort the pages by recent usage, find the least recently used page that is unpinned and evict.
         #if all pages are pinned, (for whatever reason), return error code/msg.
@@ -108,6 +108,6 @@ class bufferpool:
         for pair in self.bpool:
             if(pair[0] not in self.pinned_pages):
                 self.bpool.remove(pair)
-                return
+                return print("page evicted.")
 
         return print("all of the pages in the bufferpool are pinned. ")    
