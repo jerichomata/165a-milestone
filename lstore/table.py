@@ -6,6 +6,7 @@ from time import time
 import os
 import threading
 import struct
+import pickle
 
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
@@ -59,6 +60,7 @@ class Table:
         self.tps_list = []
         self.threading_lock = threading.Lock()
         pass
+
 
     def get_base_rid(self, rid):
         current_rid = rid
@@ -327,7 +329,7 @@ class Table:
     def write_base_page_range(self, base_pages):
         for i, page in enumerate(base_pages):
             cwd = os.getcwd()
-            path = cwd + "\lstore\disk\\" + page.table_name
+            path = cwd + "\ECS165\\" + page.table_name
             try:
                 os.mkdir(path)
             except OSError as error:
@@ -342,7 +344,7 @@ class Table:
         page_type = 'B'
         base_pages = []
         for i in range(self.num_columns_hidden):
-            with open(cwd + "\lstore\disk\\" + self.name + "\\" + page_type + str(page_range) + "-" + str(i), 'rb') as file:
+            with open(cwd + "\ECS165\\" + self.name + "\\" + page_type + str(page_range) + "-" + str(i), 'rb') as file:
                 lines = file.read()
 
                 if original:
