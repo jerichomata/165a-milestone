@@ -19,11 +19,13 @@ class bufferpool:
     #mark this page as dirty if it has been updated or recently created and not put to "disk".
     def mark_dirty(self, index):
         if self.bpool[index] not in self.dirty_pages:
+            # print("marking dirty", self.bpool[index][0].name)
             self.dirty_pages.append(self.bpool[index])
 
     #push all updates to "disk".
     def make_clean(self):
-        for page in self.bpool:
+        while self.dirty_pages:
+            page = self.dirty_pages.pop()
             cwd = os.getcwd()
             path = cwd + "\lstore\disk\\" + page[0].table_name
             try:
@@ -31,14 +33,13 @@ class bufferpool:
             except OSError as error:
                 pass
             self.write_page_to_disk(page[0], path)
-            # self.dirty_pages.remove(page)
 
     def write_page_to_disk(self, page, path):
+
         with open(path + "\\" + page.name, 'wb') as file:
             num_records = bytearray(8)
             num_records[0:8] = struct.pack('Q', page.num_records)
-            both = num_records + page.data
-            file.write(both)
+            file.write(num_records + page.data)
 
 
     def pin_page(self, index):
@@ -62,6 +63,7 @@ class bufferpool:
             self.evict_page()
             index = len(self.bpool)
             self.bpool.append([page,time.time()])
+
         return index
         
     def exist_in_bpool(self, page_type, page_range, column):
@@ -84,11 +86,13 @@ class bufferpool:
             self.bpool[exist_index][1] = time.time()
             return exist_index
 
+        page_find = Page(page_type + str(page_range) + "-" + str(column), table_name)
+
         with open(cwd + "\lstore\disk\\" + table_name + "\\" + page_type + str(page_range) + "-" + str(column), 'rb') as file:
-            lines = file.read(4104)
-            page_find = Page(page_type + str(page_range) + "-" + str(column), table_name)
+            lines = file.read()
             page_find.set_num_records(struct.unpack('Q', lines[0:8])[0])
-            page_find.set_data(lines[8:4104])
+            page_find.set_data(lines[8:])
+
 
         return self.add_page(page_find)
 
@@ -96,19 +100,20 @@ class bufferpool:
     def evict_page(self):
 
         #before any pages can be evicted we must make all pages clean so that no uncommited changes are lost.
-
         self.make_clean()
- 
         #loop through bpool and sort the pages by recent usage, find the least recently used page that is unpinned and evict.
         #if all pages are pinned, (for whatever reason), return error code/msg.
 
         #since it's a tuple, we can just sort by 
-        self.bpool.sort(key = lambda x: x[1])
+        temp = self.bpool.copy()
+        temp.sort(key = lambda x: x[1])
 
         #find first page in pages that that is not pinned.
-        for pair in self.bpool:
-            if(pair[0] not in self.pinned_pages):
+        for pair in temp:
+            if(pair[0] not in self.pinned_pages and pair[0] not in self.dirty_pages):
                 self.bpool.remove(pair)
-                return
+                return #print("page evicted ", pair[0].name)
+
+        
 
         return print("all of the pages in the bufferpool are pinned. ")    
