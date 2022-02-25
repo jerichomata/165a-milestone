@@ -210,7 +210,8 @@ class Table:
 
         self.set_value(0, starting_rid, RID_COLUMN)
 
-
+    # store it into mergpool 
+    # empty the mergepool 
     def merge(self, page_range):
         tps = 0
         base_rids = []
@@ -258,12 +259,13 @@ class Table:
             
         return page_find, new_page_range
 
-    # Run the merge on a thread, 
-    def merge_thread(self):
-        basePageCopy = copy.deepcopy(self.base_pages)
-        while concurrent.futures.ThreadPoolExecutor():
-            background = concurrent.futures.Executor.submit(self.merge, basePageCopy, self.tail_pages)
-            merged = background.result()
-            for i, merged in enum(merged):
-                self.base_pages[i].tps = merged.tps
-                
+    # Run the merge on a thread
+    def merge_thread(self, rid):
+        getRID = self.page_directory.get(rid)
+        pageRange = getRID.get('page_range')
+        if # page range update % when merge is triggered:
+            mergeThread = threading.Thread(target=self.merge)
+            mergeThread.daemon = True
+            mergeThread.start()
+            # aquire lock and 
+            # define thread and lock it
