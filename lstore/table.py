@@ -41,7 +41,7 @@ class Table:
     base_pages: list of base pages
     tail_pages: list of tail pages
     """
-    def __init__(self, name, num_columns, key, bpool):
+    def __init__(self, name, num_columns, key, bpool, mpool):
         self.name = name
         self.primary_key_column = key
         self.primary_key_column_hidden = key + 4
@@ -54,6 +54,7 @@ class Table:
         self.tail_page_ranges = 0
         self.index = Index(self)
         self.bpool = bpool
+        self.mpool = mpool
         self.tps_list = []
         self.threading_lock = threading.lock()
         pass
@@ -102,6 +103,18 @@ class Table:
         self.bpool.bpool[index][0].set_value(value, location[2])
         self.bpool.mark_dirty(index)
 
+    def mpool_get_value(self, rid, column):
+        location = self.page_directory[rid]
+
+        index = self.mpool.find_page(self.name, location[0], location[1] , column)
+        return self.mpool.bpool[index][0].read(location[2])
+
+    def mpool_set_value(self, value, rid, column):
+        location = self.page_directory[rid]
+
+        index = self.mpool.find_page(self.name, location[0], location[1] , column)
+        self.mpool.bpool[index][0].set_value(value, location[2])
+        self.mpool.mark_dirty(index)
 
     def is_base(self, rid):
         return self.page_directory[rid][0]
@@ -227,12 +240,14 @@ class Table:
                 tps = rid
 
             for j in range(2, self.num_columns_hidden):
-                base_pages[j].set_value(self.get_value(rid, j), i)
+                base_pages[j].set_value(self.mpool_get_value(rid, j), i)
 
         self.write_base_page_range(base_pages)
+        
 
         for rid in base_rids:
             self.page_directory[rid][1] = new_page_range
+
 
         self.tps_list.insert(page_range-1, tps)
 
@@ -241,7 +256,7 @@ class Table:
             cwd = os.getcwd()
             path = cwd + "\\disk\\" + page.table
             os.mkdir(path)
-            self.bpool.write_page_to_disk(page, path)
+            self.mpool.write_page_to_disk(page, path)
 
 
     # reads all base pages from disk and stores it into a list of base pages
@@ -258,14 +273,3 @@ class Table:
                 page_find.set_data(lines[1])
             
         return page_find, new_page_range
-
-    # Run the merge on a thread
-    def merge_thread(self, rid):
-        getRID = self.page_directory.get(rid)
-        pageRange = getRID.get('page_range')
-        if # page range update % when merge is triggered:
-            mergeThread = threading.Thread(target=self.merge)
-            mergeThread.daemon = True
-            mergeThread.start()
-            # aquire lock and 
-            # define thread and lock it
