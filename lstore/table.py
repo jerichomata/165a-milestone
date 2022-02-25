@@ -40,7 +40,7 @@ class Table:
     base_pages: list of base pages
     tail_pages: list of tail pages
     """
-    def __init__(self, name, num_columns, key, bpool):
+    def __init__(self, name="table", num_columns=1, key=0, bpool=bufferpool()):
         self.name = name
         self.threads = {}
         self.primary_key_column = key
@@ -61,6 +61,18 @@ class Table:
         self.threading_lock = threading.Lock()
         pass
 
+    def __getstate__(self):
+        return (self.name, self.primary_key_column, self.primary_key_column_hidden, 
+            self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, 
+            self.original_base_pages, self.base_page_ranges, self.tail_page_ranges, self.merged_base_page_ranges,
+            self.index, self.bpool, self.mpool, self.tps_list)
+    
+    def __setstate__(self, state):
+
+        self.name, self.primary_key_column, self.primary_key_column_hidden, self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.original_base_pages, self.base_page_ranges, self.tail_page_ranges, self.merged_base_page_ranges, self.index, self.bpool, self.mpool, self.tps_list = state
+
+        self.threading_lock = threading.Lock()
+        self.threads = {}
 
     def get_base_rid(self, rid):
         current_rid = rid
@@ -102,7 +114,7 @@ class Table:
 
         if rid == 1:
             base_index = self.bpool.find_page( self.name, True, location[1] , column)
-            self.bpool.bpool[index][1] = time()
+            self.bpool.bpool[base_index][1] = time()
             return self.bpool.bpool[base_index][0].read(location[2])
 
         new_location = self.page_directory[rid]

@@ -17,6 +17,11 @@ class Database():
         self.bpool = bufferpool()
         #if database is new and there are previous files 
         files = []
+        try:
+            os.mkdir(path)
+        except:
+            pass
+
         for filename in os.listdir(path):
             files.append(filename)
 

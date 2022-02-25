@@ -37,7 +37,7 @@ class bufferpool:
 
     def make_clean2(self, page):
         cwd = os.getcwd()
-        path = cwd + "\lstore\disk\\" + page.table_name
+        path = cwd + "\ECS165\\" + page.table_name
         try:
             os.mkdir(path)
         except OSError as error:
