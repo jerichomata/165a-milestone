@@ -76,16 +76,14 @@ class Table:
 
     def get_newest_value(self, base_rid, column):
 
-        
-
         location = self.page_directory[base_rid]
 
         base_index = self.bpool.find_page( self.name, True, location[1] , INDIRECTION_COLUMN )
         
         rid = self.bpool.bpool[base_index][0].read(location[2])
 
-        if (self.tps_list[location[1]] > rid):
-            self.thread.start(target=self.merge, args=base_index)
+        if (self.tps_list[location[2]] > rid):
+            self.thread.start(target=self.merge, args=location[1])
             self.thread.join()
 
         if rid == 1:
