@@ -6,8 +6,6 @@ from time import time
 
 import os
 import threading
-import concurrent.futures
-import copy
 
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
@@ -239,14 +237,15 @@ class Table:
             if rid > tps:
                 tps = rid
 
+
             for j in range(2, self.num_columns_hidden):
                 base_pages[j].set_value(self.mpool_get_value(rid, j), i)
 
         self.write_base_page_range(base_pages)
-        
-
+        self.threading_lock.aquire()
         for rid in base_rids:
             self.page_directory[rid][1] = new_page_range
+        self.threading_lock.release()
 
 
         self.tps_list.insert(page_range-1, tps)
