@@ -2,11 +2,6 @@
 A data strucutre holding indices for various columns of a table. Key column should be indexd by default, other columns can be indexed through self object. Indices are usually B-Trees, but other data structures can be used as well.
 """
 
-from asyncio.windows_events import NULL
-from email.mime import base
-from operator import contains
-from tkinter.tix import COLUMN
-
 
 def cmp(a, b):
     return (a > b) - (a < b)
@@ -81,9 +76,10 @@ class Index:
         high = len(column)-1
         while(low <= high):
             mid = int((low+high)//2)
-            if (self.table.get_newest_value(column[mid], index) > value):
+            check_value = self.table.get_newest_value(column[mid], index)
+            if (check_value > value):
                 high = mid - 1
-            elif (self.table.get_newest_value(column[mid], index) == value):
+            elif (check_value == value):
                 records.append(column[mid])
                 current_mid = mid
                 while(self.table.get_newest_value(column[current_mid], index) == value and current_mid < high):

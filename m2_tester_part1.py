@@ -1,9 +1,10 @@
 from lstore.db import Database
 from lstore.query import Query
-
+from time import process_time
 from random import choice, randint, sample, seed
 
 db = Database()
+db.open('./ECS165')
 # Create a table  with 5 columns
 #   Student Id and 4 grades
 #   The first argument is name of the table
@@ -23,7 +24,7 @@ number_of_aggregates = 100
 number_of_updates = 10
 
 seed(3562901)
-
+overall_time_0 = process_time()
 for i in range(0, number_of_records):
     key = 92106429 + i
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
@@ -64,10 +65,11 @@ for _ in range(number_of_updates):
                 if column != records[key][j]:
                     error = True
             if error:
-                print('update error on', original, 'and', updated_columns, ':', record, ', correct:', records[key])
+                print('update error on', original, 'and', updated_columns, ':', record.columns, ', correct:', records[key])
+                quit()
             else:
                 pass
-                # print('update on', original, 'and', updated_columns, ':', record)
+                #print('update on', original, 'and', updated_columns, ':', record)
             updated_columns[i] = None
 print("Update finished")
 
@@ -82,3 +84,5 @@ for i in range(0, number_of_aggregates):
         # print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
 print("Aggregate finished")
 db.close()
+overall_time_1 = process_time()
+print("Running tester took: ", overall_time_1 - overall_time_0)

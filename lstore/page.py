@@ -5,11 +5,21 @@ import struct
 
 class Page:
 
-    def __init__(self):
+    def __init__(self, name, table_name):
+        self.name = name
+        self.table_name = table_name
         self.num_records = 0
         self.data = bytearray(4096)
 
+    def set_num_records(self, value):
+        self.num_records = value
 
+    def get_name(self):
+        return self.name
+        
+    def set_data(self, data):
+        self.data = bytearray(data)
+    
     def has_capacity(self):
         if(self.num_records * 8 < len(self.data)):
             return True
@@ -21,7 +31,6 @@ class Page:
             value = int(value)
             self.data[self.num_records * 8: self.num_records*8 + 8] = struct.pack('Q', value)
             self.num_records += 1
-            # print("Written" + str(value))
         else:
             print("Could not write")
 
