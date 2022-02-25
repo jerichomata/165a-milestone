@@ -1,6 +1,6 @@
 from lstore.db import Database
 from lstore.query import Query
-
+from time import process_time
 from random import choice, randint, sample, seed
 
 db = Database()
@@ -21,10 +21,10 @@ records = {}
 
 number_of_records = 1000
 number_of_aggregates = 100
-number_of_updates = 1
+number_of_updates = 10
 
 seed(3562901)
-
+overall_time_0 = process_time()
 for i in range(0, number_of_records):
     key = 92106429 + i
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
@@ -84,3 +84,5 @@ for i in range(0, number_of_aggregates):
         # print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
 print("Aggregate finished")
 db.close()
+overall_time_1 = process_time()
+print("Running tester took: ", overall_time_1 - overall_time_0)
