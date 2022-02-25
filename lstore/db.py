@@ -1,6 +1,9 @@
+from importlib.metadata import metadata
 from lstore.bpool import bufferpool
 from asyncio.windows_events import NULL
 from lstore.table import Table
+import os
+import pickle
 
 class Database():
 
@@ -9,16 +12,24 @@ class Database():
         pass
 
     # Not required for milestone1
-    def open(self):
+    def open(self, path): 
         #db needs a bufferpool now
         self.bpool = bufferpool()
+        for filename in os.listdir(path):
+            for files in os.listdir(path.join(path+filename)):
+                if files.equals("metadata"):
+                    with open(path.join(path+filename+files), 'rb') as file:
+                        self.tables.append(pickle.load(file))
         pass
 
     def close(self):
         #all changes non-commited changes must be written to disk before closure
         self.bpool.make_clean()
+        for table in self.tables:
+            cwd = os.getcwd()
+            with open(cwd + "\lstore\ECS165\\" + self.table.name + "\\metadata", 'wb') as file:
+                pickle.dump(table, file)
         pass
-
     """
     # Creates a new table
     :param name: string         #Table name

@@ -27,7 +27,7 @@ class bufferpool:
         while self.dirty_pages:
             page = self.dirty_pages.pop()
             cwd = os.getcwd()
-            path = cwd + "\lstore\disk\\" + page[0].table_name
+            path = cwd + "\lstore\ECS165\\" + page[0].table_name
             try:
                 os.mkdir(path)
             except OSError as error:
@@ -87,7 +87,7 @@ class bufferpool:
 
         page_find = Page(page_type + str(page_range) + "-" + str(column), table_name)
 
-        with open(cwd + "\lstore\disk\\" + table_name + "\\" + page_type + str(page_range) + "-" + str(column), 'rb') as file:
+        with open(cwd + "\lstore\ECS165\\" + table_name + "\\" + page_type + str(page_range) + "-" + str(column), 'rb') as file:
             lines = file.read()
             page_find.set_num_records(struct.unpack('Q', lines[0:8])[0])
             page_find.set_data(lines[8:])
