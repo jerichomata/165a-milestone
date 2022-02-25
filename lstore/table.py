@@ -1,9 +1,13 @@
+import enum
 from logging import NullHandler
 from lstore.index import Index
 from lstore.page import Page
 from time import time
 
 import os
+import threading
+import concurrent.futures
+import copy
 
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
@@ -51,6 +55,7 @@ class Table:
         self.index = Index(self)
         self.bpool = bpool
         self.tps_list = []
+        self.threading_lock = threading.lock()
         pass
 
     def get_base_rid(self, rid):
@@ -252,3 +257,13 @@ class Table:
                 page_find.set_data(lines[1])
             
         return page_find, new_page_range
+
+    # Run the merge on a thread, 
+    def merge_thread(self):
+        basePageCopy = copy.deepcopy(self.base_pages)
+        while concurrent.futures.ThreadPoolExecutor():
+            background = concurrent.futures.Executor.submit(self.merge, basePageCopy, self.tail_pages)
+            merged = background.result()
+            for i, merged in enum(merged):
+                self.base_pages[i].tps = merged.tps
+                
