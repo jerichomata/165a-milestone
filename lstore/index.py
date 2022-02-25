@@ -76,9 +76,10 @@ class Index:
         high = len(column)-1
         while(low <= high):
             mid = int((low+high)//2)
-            if (self.table.get_newest_value(column[mid], index) > value):
+            check_value = self.table.get_newest_value(column[mid], index)
+            if (check_value > value):
                 high = mid - 1
-            elif (self.table.get_newest_value(column[mid], index) == value):
+            elif (check_value == value):
                 records.append(column[mid])
                 current_mid = mid
                 while(self.table.get_newest_value(column[current_mid], index) == value and current_mid < high):

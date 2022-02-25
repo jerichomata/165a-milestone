@@ -52,6 +52,7 @@ class Table:
         self.index = Index(self)
         self.bpool = bpool
         self.tps_list = []
+        self.t08records = 0
         pass
 
     def get_base_rid(self, rid):
@@ -72,7 +73,7 @@ class Table:
         location = self.page_directory[base_rid]
 
         base_index = self.bpool.find_page( self.name, True, location[1] , INDIRECTION_COLUMN )
-        
+        self.bpool.bpool[base_index][1] = time.time()
         rid = self.bpool.bpool[base_index][0].read(location[2])
 
         if rid == 1:
@@ -81,16 +82,15 @@ class Table:
 
         new_location = self.page_directory[rid]
         index = self.bpool.find_page( self.name, False, new_location[1], column)
-        offset = (new_location[2])
-        print("")
-        a = self.bpool.bpool[index][0].read(offset)
-        return a
+        self.bpool.bpool[index][1] = time.time()
+        return self.bpool.bpool[index][0].read(new_location[2])
 
 
     def get_value(self, rid, column):
         location = self.page_directory[rid]
 
         index = self.bpool.find_page(self.name, location[0], location[1] , column)
+        self.bpool.bpool[index][1] = time.time()
         return self.bpool.bpool[index][0].read(location[2])
 
     def set_value(self, value, rid, column):
@@ -105,6 +105,7 @@ class Table:
         return self.page_directory[rid][0]
 
     def add_record(self, record):
+        
         record.columns.insert(INDIRECTION_COLUMN, 1)
         record.columns.insert(RID_COLUMN, record.rid)
         record.columns.insert(TIMESTAMP_COLUMN, time.time())
@@ -123,6 +124,7 @@ class Table:
                 current_index = self.bpool.find_page(self.name, True, self.base_page_ranges-1, j)
                 self.bpool.bpool[current_index][0].write(record.columns[j])
                 self.bpool.mark_dirty(current_index)
+                
         else:
             for j in range(self.num_columns_hidden):
                 page = Page("B" + str(self.base_page_ranges) + "-" + str(j), self.name)
@@ -139,6 +141,7 @@ class Table:
 
 
     def update_record(self, record, base_rid):
+        
         new_rid = record.rid
 
         #Get old base page indirection to set as indirection column on this entry
@@ -182,6 +185,8 @@ class Table:
                 current_index = self.bpool.find_page(self.name, False, self.tail_page_ranges-1, j)
                 self.bpool.bpool[current_index][0].write(record.columns[j])
                 self.bpool.mark_dirty(current_index)
+                index = current_index
+                
         else:
             for j in range(self.num_columns_hidden):
                 page = Page("T" + str(self.tail_page_ranges) + "-" + str(j), self.name)
@@ -192,6 +197,7 @@ class Table:
             self.tail_page_ranges += 1
 
         offset = self.bpool.bpool[index][0].num_records - 1
+
 
         self.page_directory[new_rid] = [False, self.tail_page_ranges-1, offset]
         self.index.update(record, base_rid)
