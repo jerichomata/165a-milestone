@@ -8,7 +8,7 @@ class bufferpool:
 
     #intialize a 3x5 bufferpool, this is an arbitrary size. 
     def __init__(self):
-        self.MAX_SIZE = 20
+        self.MAX_SIZE = 55
         #bufferpool that stores tuple ( page, time_accessed ).
         self.bpool = []
         self.path = []
@@ -33,6 +33,16 @@ class bufferpool:
             except OSError as error:
                 pass
             self.write_page_to_disk(page[0], path)
+
+
+    def make_clean2(self, page):
+        cwd = os.getcwd()
+        path = cwd + "\lstore\disk\\" + page.table_name
+        try:
+            os.mkdir(path)
+        except OSError as error:
+            pass
+        self.write_page_to_disk(page, path)
 
     def write_page_to_disk(self, page, path):
         with open(path + "\\" + page.name, 'wb') as file:
@@ -99,7 +109,7 @@ class bufferpool:
     def evict_page(self):
 
         #before any pages can be evicted we must make all pages clean so that no uncommited changes are lost.
-        self.make_clean()
+        # self.make_clean()
         #loop through bpool and sort the pages by recent usage, find the least recently used page that is unpinned and evict.
         #if all pages are pinned, (for whatever reason), return error code/msg.
 
@@ -110,6 +120,7 @@ class bufferpool:
         #find first page in pages that that is not pinned.
         for pair in temp:
             if(pair[0] not in self.pinned_pages and pair[0] not in self.dirty_pages):
+                self.make_clean2(pair[0])
                 self.bpool.remove(pair)
                 return #print("page evicted ", pair[0].name)
 

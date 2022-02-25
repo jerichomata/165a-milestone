@@ -41,7 +41,7 @@ class Table:
     """
     def __init__(self, name, num_columns, key, bpool):
         self.name = name
-        self.thread = None
+        self.threads = {}
         self.primary_key_column = key
         self.primary_key_column_hidden = key + 4
         self.num_columns = num_columns
@@ -57,6 +57,7 @@ class Table:
         self.bpool = bpool
         self.mpool = None
         self.tps_list = []
+        self.threading_lock = threading.Lock()
         pass
 
     def get_base_rid(self, rid):
@@ -80,16 +81,27 @@ class Table:
         base_index = self.bpool.find_page( self.name, True, location[1] , INDIRECTION_COLUMN )
         self.bpool.bpool[base_index][1] = time()
         rid = self.bpool.bpool[base_index][0].read(location[2])
-        if (rid - 1024 > self.tps_list[location[1]]):
+
+
+        if location[1] not in self.threads.keys():
+            self.threads[location[1]] = threading.Thread(target=self.merge, args=(location[1],))
+            if rid - 1024 > self.tps_list[location[1]] and not self.threads[location[1]].is_alive():
+                self.bpool.make_clean()
+                self.threads[location[1]].start()
+        elif self.threads[location[1]].is_alive():
+            self.threads[location[1]].join()
+        elif (rid - 1024 > self.tps_list[location[1]] and not self.threads[location[1]].is_alive()):
             self.bpool.make_clean()
-            self.merge(location[1])
+            self.threads[location[1]] = threading.Thread(target=self.merge, args=(location[1],))
+            self.threads[location[1]].start()
+
 
         if rid == 1:
             base_index = self.bpool.find_page( self.name, True, location[1] , column)
             return self.bpool.bpool[base_index][0].read(location[2])
 
         new_location = self.page_directory[rid]
-        index = self.bpool.find_page( self.name, False, new_location[1], column)
+        index = self.bpool.find_page( self.name, new_location[0], new_location[1], column)
         self.bpool.bpool[index][1] = time()
 
 
@@ -256,6 +268,8 @@ class Table:
     # store it into mergpool 
     # empty the mergepool 
     def merge(self, page_range):
+        
+        self.threading_lock.acquire()
         if page_range not in self.original_base_pages:
             original = False
         else:
@@ -287,7 +301,9 @@ class Table:
         else:
             self.tps_list[page_range] = tps
         self.merged_base_page_ranges += 1
-        print("merge successful")
+
+        self.threading_lock.release()
+
         self.mpool = None
 
     def write_base_page_range(self, base_pages):
