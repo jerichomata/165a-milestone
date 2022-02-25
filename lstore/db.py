@@ -12,6 +12,7 @@ class Database():
     def open(self):
         #db needs a bufferpool now
         self.bpool = bufferpool()
+        self.mpool = bufferpool()
         pass
 
     def close(self):
@@ -26,7 +27,7 @@ class Database():
     :param key: int             #Index of table key in columns
     """
     def create_table(self, name, num_columns, key_index):
-        table = Table(name, num_columns, key_index, self.bpool)
+        table = Table(name, num_columns, key_index, self.bpool, self.mpool)
         return table
 
     """

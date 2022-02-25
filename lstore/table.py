@@ -1,10 +1,12 @@
+import enum
+from heapq import merge
 from logging import NullHandler
+from re import X
 from lstore.index import Index
 from lstore.page import Page
-from time import time
 
 import os
-import time
+import threading
 
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
@@ -38,8 +40,9 @@ class Table:
     base_pages: list of base pages
     tail_pages: list of tail pages
     """
-    def __init__(self, name, num_columns, key, bpool):
+    def __init__(self, name, num_columns, key, bpool, mpool):
         self.name = name
+        self.thread = threading.Thread(target=merge, args=self.base_page_ranges, daemon=True)
         self.primary_key_column = key
         self.primary_key_column_hidden = key + 4
         self.num_columns = num_columns
@@ -51,8 +54,9 @@ class Table:
         self.tail_page_ranges = 0
         self.index = Index(self)
         self.bpool = bpool
+        self.mpool = mpool
         self.tps_list = []
-        self.t08records = 0
+        self.threading_lock = threading.lock()
         pass
 
     def get_base_rid(self, rid):
@@ -70,11 +74,16 @@ class Table:
 
 
     def get_newest_value(self, base_rid, column):
+
         location = self.page_directory[base_rid]
 
         base_index = self.bpool.find_page( self.name, True, location[1] , INDIRECTION_COLUMN )
         self.bpool.bpool[base_index][1] = time.time()
         rid = self.bpool.bpool[base_index][0].read(location[2])
+
+        if (self.tps_list[location[2]] > rid):
+            self.thread.start(target=self.merge, args=location[1])
+            self.thread.join()
 
         if rid == 1:
             base_index = self.bpool.find_page( self.name, True, location[1] , column)
@@ -100,6 +109,18 @@ class Table:
         self.bpool.bpool[index][0].set_value(value, location[2])
         self.bpool.mark_dirty(index)
 
+    def mpool_get_value(self, rid, column):
+        location = self.page_directory[rid]
+
+        index = self.mpool.find_page(self.name, location[0], location[1] , column)
+        return self.mpool.bpool[index][0].read(location[2])
+
+    def mpool_set_value(self, value, rid, column):
+        location = self.page_directory[rid]
+
+        index = self.mpool.find_page(self.name, location[0], location[1] , column)
+        self.mpool.bpool[index][0].set_value(value, location[2])
+        self.mpool.mark_dirty(index)
 
     def is_base(self, rid):
         return self.page_directory[rid][0]
@@ -133,7 +154,7 @@ class Table:
                 self.bpool.mark_dirty(index)
             
             self.base_page_ranges += 1
-            
+
         offset = self.bpool.bpool[index][0].num_records - 1
 
         self.page_directory[record.rid] = [True, self.base_page_ranges-1, offset]
@@ -214,7 +235,8 @@ class Table:
 
         self.set_value(0, starting_rid, RID_COLUMN)
 
-
+    # store it into mergpool 
+    # empty the mergepool 
     def merge(self, page_range):
         tps = 0
         base_rids = []
@@ -229,13 +251,16 @@ class Table:
             if rid > tps:
                 tps = rid
 
+
             for j in range(2, self.num_columns_hidden):
-                base_pages[j].set_value(self.get_value(rid, j), i)
+                base_pages[j].set_value(self.mpool_get_value(rid, j), i)
 
         self.write_base_page_range(base_pages)
-
+        self.threading_lock.aquire()
         for rid in base_rids:
             self.page_directory[rid][1] = new_page_range
+        self.threading_lock.release()
+
 
         self.tps_list.insert(page_range-1, tps)
 
@@ -244,7 +269,7 @@ class Table:
             cwd = os.getcwd()
             path = cwd + "\\disk\\" + page.table
             os.mkdir(path)
-            self.bpool.write_page_to_disk(page, path)
+            self.mpool.write_page_to_disk(page, path)
 
 
     # reads all base pages from disk and stores it into a list of base pages
