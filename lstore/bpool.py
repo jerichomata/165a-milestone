@@ -35,7 +35,6 @@ class bufferpool:
             self.write_page_to_disk(page[0], path)
 
     def write_page_to_disk(self, page, path):
-
         with open(path + "\\" + page.name, 'wb') as file:
             num_records = bytearray(8)
             num_records[0:8] = struct.pack('Q', page.num_records)

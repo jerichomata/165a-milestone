@@ -1,12 +1,11 @@
-import enum
-from heapq import merge
-from logging import NullHandler
-from re import X
 from lstore.index import Index
 from lstore.page import Page
+from lstore.bpool import bufferpool
+from time import time
 
 import os
 import threading
+import struct
 
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
@@ -40,9 +39,9 @@ class Table:
     base_pages: list of base pages
     tail_pages: list of tail pages
     """
-    def __init__(self, name, num_columns, key, bpool, mpool):
+    def __init__(self, name, num_columns, key, bpool):
         self.name = name
-        self.thread = threading.Thread(target=merge, args=self.base_page_ranges, daemon=True)
+        self.thread = None
         self.primary_key_column = key
         self.primary_key_column_hidden = key + 4
         self.num_columns = num_columns
@@ -50,13 +49,14 @@ class Table:
         self.current_rid = 1
         self.num_records = 0
         self.page_directory = {}
+        self.original_base_pages = []
         self.base_page_ranges = 0
         self.tail_page_ranges = 0
+        self.merged_base_page_ranges = 0
         self.index = Index(self)
         self.bpool = bpool
-        self.mpool = mpool
+        self.mpool = None
         self.tps_list = []
-        self.threading_lock = threading.lock()
         pass
 
     def get_base_rid(self, rid):
@@ -78,12 +78,11 @@ class Table:
         location = self.page_directory[base_rid]
 
         base_index = self.bpool.find_page( self.name, True, location[1] , INDIRECTION_COLUMN )
-        self.bpool.bpool[base_index][1] = time.time()
+        self.bpool.bpool[base_index][1] = time()
         rid = self.bpool.bpool[base_index][0].read(location[2])
-
-        if (self.tps_list[location[2]] > rid):
-            self.thread.start(target=self.merge, args=location[1])
-            self.thread.join()
+        if (rid - 1024 > self.tps_list[location[1]]):
+            self.bpool.make_clean()
+            self.merge(location[1])
 
         if rid == 1:
             base_index = self.bpool.find_page( self.name, True, location[1] , column)
@@ -91,7 +90,10 @@ class Table:
 
         new_location = self.page_directory[rid]
         index = self.bpool.find_page( self.name, False, new_location[1], column)
-        self.bpool.bpool[index][1] = time.time()
+        self.bpool.bpool[index][1] = time()
+
+
+        
         return self.bpool.bpool[index][0].read(new_location[2])
 
 
@@ -99,7 +101,7 @@ class Table:
         location = self.page_directory[rid]
 
         index = self.bpool.find_page(self.name, location[0], location[1] , column)
-        self.bpool.bpool[index][1] = time.time()
+        self.bpool.bpool[index][1] = time()
         return self.bpool.bpool[index][0].read(location[2])
 
     def set_value(self, value, rid, column):
@@ -109,11 +111,22 @@ class Table:
         self.bpool.bpool[index][0].set_value(value, location[2])
         self.bpool.mark_dirty(index)
 
-    def mpool_get_value(self, rid, column):
-        location = self.page_directory[rid]
+    def mpool_get_value(self, base_rid, column):
+        location = self.page_directory[base_rid]
 
-        index = self.mpool.find_page(self.name, location[0], location[1] , column)
-        return self.mpool.bpool[index][0].read(location[2])
+        base_index = self.mpool.find_page( self.name, True, location[1] , INDIRECTION_COLUMN )
+        self.mpool.bpool[base_index][1] = time()
+        rid = self.mpool.bpool[base_index][0].read(location[2])
+
+        if rid == 1:
+            
+            base_index = self.mpool.find_page( self.name, True, location[1] , column)
+            return self.mpool.bpool[base_index][0].read(location[2])
+
+        new_location = self.page_directory[rid]
+        index = self.mpool.find_page( self.name, False, new_location[1], column)
+        self.mpool.bpool[index][1] = time()
+        return self.mpool.bpool[index][0].read(new_location[2])
 
     def mpool_set_value(self, value, rid, column):
         location = self.page_directory[rid]
@@ -129,7 +142,7 @@ class Table:
         
         record.columns.insert(INDIRECTION_COLUMN, 1)
         record.columns.insert(RID_COLUMN, record.rid)
-        record.columns.insert(TIMESTAMP_COLUMN, time.time())
+        record.columns.insert(TIMESTAMP_COLUMN, time())
         record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
 
 
@@ -137,6 +150,8 @@ class Table:
             for i in range(self.num_columns_hidden):
                 self.bpool.add_page(Page("B" + str(self.base_page_ranges) + "-" + str(i), self.name))
             self.base_page_ranges = 1
+            self.tps_list.append(0)
+
         
 
         index = self.bpool.find_page(self.name, True, self.base_page_ranges-1, 0)
@@ -154,9 +169,11 @@ class Table:
                 self.bpool.mark_dirty(index)
             
             self.base_page_ranges += 1
+            self.tps_list.append(0)
 
         offset = self.bpool.bpool[index][0].num_records - 1
-
+        if (self.base_page_ranges - 1) not in self.original_base_pages:
+            self.original_base_pages.append(self.base_page_ranges - 1)
         self.page_directory[record.rid] = [True, self.base_page_ranges-1, offset]
         self.index.sorted_insert(record, record.rid)
 
@@ -174,7 +191,7 @@ class Table:
 
         record.columns.insert(RID_COLUMN, record.rid)
 
-        record.columns.insert(TIMESTAMP_COLUMN, time.time())
+        record.columns.insert(TIMESTAMP_COLUMN, time())
 
         record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
 
@@ -207,6 +224,7 @@ class Table:
                 self.bpool.bpool[current_index][0].write(record.columns[j])
                 self.bpool.mark_dirty(current_index)
                 index = current_index
+
                 
         else:
             for j in range(self.num_columns_hidden):
@@ -238,14 +256,19 @@ class Table:
     # store it into mergpool 
     # empty the mergepool 
     def merge(self, page_range):
+        if page_range not in self.original_base_pages:
+            original = False
+        else:
+            original = True
+        
+        self.mpool = bufferpool()
         tps = 0
         base_rids = []
-        base_pages, new_page_range = self.read_base_page_range(page_range)
+        base_pages, new_page_range = self.read_base_page_range(page_range,original)
 
         for i in range(base_pages[0].num_records):
-            
-            rid = base_pages[0].read[i]
-            base_rid = base_pages[1].read[i]
+            rid = base_pages[0].read(i)
+            base_rid = base_pages[1].read(i)
             base_rids.append(base_rid)
 
             if rid > tps:
@@ -253,36 +276,49 @@ class Table:
 
 
             for j in range(2, self.num_columns_hidden):
-                base_pages[j].set_value(self.mpool_get_value(rid, j), i)
+                base_pages[j].set_value(self.mpool_get_value(base_rid, j), i)
 
         self.write_base_page_range(base_pages)
-        self.threading_lock.aquire()
         for rid in base_rids:
             self.page_directory[rid][1] = new_page_range
-        self.threading_lock.release()
 
-
-        self.tps_list.insert(page_range-1, tps)
+        if original:
+            self.tps_list.append(tps)
+        else:
+            self.tps_list[page_range] = tps
+        self.merged_base_page_ranges += 1
+        print("merge successful")
+        self.mpool = None
 
     def write_base_page_range(self, base_pages):
         for i, page in enumerate(base_pages):
             cwd = os.getcwd()
-            path = cwd + "\\disk\\" + page.table
-            os.mkdir(path)
+            path = cwd + "\lstore\disk\\" + page.table_name
+            try:
+                os.mkdir(path)
+            except OSError as error:
+                pass
             self.mpool.write_page_to_disk(page, path)
 
 
     # reads all base pages from disk and stores it into a list of base pages
-    def read_base_page_range(self, page_range):
-        new_page_range = len(self.tps_list)
+    def read_base_page_range(self, page_range, original):
+        in_page_range = None
         cwd = os.getcwd()
         page_type = 'B'
+        base_pages = []
         for i in range(self.num_columns_hidden):
-            with open(cwd + "\\disk\\" + self.name + "\\" + page_type + str(page_range) + "-" + str(i) + ".txt", 'r') as file:
-                lines = file.readlines()
-                lines.split(" ")
-                page_find = Page(page_type + new_page_range + "-" + i, self.name)
-                page_find.set_num_records(lines[0])
-                page_find.set_data(lines[1])
+            with open(cwd + "\lstore\disk\\" + self.name + "\\" + page_type + str(page_range) + "-" + str(i), 'rb') as file:
+                lines = file.read()
+
+                if original:
+                    in_page_range = len(self.tps_list)
+                else:
+                    in_page_range = page_range
+
+                page_find = Page(page_type + str(in_page_range) + "-" + str(i), self.name)
+                page_find.set_num_records(struct.unpack('Q', lines[0:8])[0])
+                page_find.set_data(lines[8:])
+                base_pages.append(page_find)
             
-        return page_find, new_page_range
+        return base_pages, in_page_range
