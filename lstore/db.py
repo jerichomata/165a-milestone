@@ -15,19 +15,30 @@ class Database():
     def open(self, path): 
         #db needs a bufferpool now
         self.bpool = bufferpool()
+        #if database is new and there are previous files 
+        files = []
         for filename in os.listdir(path):
-            for files in os.listdir(path.join(path+filename)):
-                if files.equals("metadata"):
-                    with open(path.join(path+filename+files), 'rb') as file:
-                        self.tables.append(pickle.load(file))
+            files.append(filename)
+
+        if len(self.tables) == 0 and len(files) != 0:
+            for filename in files:
+                newpath = os.path.join(path, filename)
+                for file in os.listdir(newpath):
+                    if file == "metadata":
+                        print("good")
+                        final = newpath+"\\metadata"
+                        with open(final, 'rb') as target:
+                            self.tables.append(pickle.load(target))
+                            print("done")
         pass
 
     def close(self):
         #all changes non-commited changes must be written to disk before closure
         self.bpool.make_clean()
         for table in self.tables:
-            cwd = os.getcwd()
-            with open(cwd + "\lstore\ECS165\\" + self.table.name + "\\metadata", 'wb') as file:
+            #print(type(table))
+             cwd = os.getcwd()
+             with open(cwd + "\ECS165\\" + table.name + "\\metadata", 'wb') as file:
                 pickle.dump(table, file)
         pass
     """
@@ -38,6 +49,7 @@ class Database():
     """
     def create_table(self, name, num_columns, key_index):
         table = Table(name, num_columns, key_index, self.bpool)
+        self.tables.append(table)
         return table
 
     """

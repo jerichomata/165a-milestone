@@ -4,7 +4,7 @@ from lstore.query import Query
 from random import choice, randint, sample, seed
 
 db = Database()
-db.open()
+db.open('./ECS165')
 # Create a table  with 5 columns
 #   Student Id and 4 grades
 #   The first argument is name of the table
