@@ -37,7 +37,8 @@ class bufferpool:
         with open(path + "\\" + page.name, 'wb') as file:
             num_records = bytearray(8)
             num_records[0:8] = struct.pack('Q', page.num_records)
-            file.write(num_records + page.data)
+            both = num_records + page.data
+            file.write(both)
 
 
     def pin_page(self, index):
@@ -84,10 +85,10 @@ class bufferpool:
             return exist_index
 
         with open(cwd + "\lstore\disk\\" + table_name + "\\" + page_type + str(page_range) + "-" + str(column), 'rb') as file:
-            lines = file.read(5004)
+            lines = file.read(4104)
             page_find = Page(page_type + str(page_range) + "-" + str(column), table_name)
             page_find.set_num_records(struct.unpack('Q', lines[0:8])[0])
-            page_find.set_data(bytearray(lines[8:5004]))
+            page_find.set_data(lines[8:4104])
 
         return self.add_page(page_find)
 
@@ -108,6 +109,6 @@ class bufferpool:
         for pair in self.bpool:
             if(pair[0] not in self.pinned_pages):
                 self.bpool.remove(pair)
-                return print("page evicted.")
+                return
 
         return print("all of the pages in the bufferpool are pinned. ")    

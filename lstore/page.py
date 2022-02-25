@@ -18,7 +18,7 @@ class Page:
         return self.name
         
     def set_data(self, data):
-        self.data = data
+        self.data = bytearray(data)
     
     def has_capacity(self):
         if(self.num_records * 8 < len(self.data)):
