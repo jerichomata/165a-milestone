@@ -1,5 +1,7 @@
 import enum
+from heapq import merge
 from logging import NullHandler
+from re import X
 from lstore.index import Index
 from lstore.page import Page
 from time import time
@@ -41,6 +43,7 @@ class Table:
     """
     def __init__(self, name, num_columns, key, bpool, mpool):
         self.name = name
+        self.thread = threading.Thread(target=merge, args=self.base_page_ranges, daemon=True)
         self.primary_key_column = key
         self.primary_key_column_hidden = key + 4
         self.num_columns = num_columns
@@ -72,11 +75,18 @@ class Table:
 
 
     def get_newest_value(self, base_rid, column):
+
+        
+
         location = self.page_directory[base_rid]
 
         base_index = self.bpool.find_page( self.name, True, location[1] , INDIRECTION_COLUMN )
         
         rid = self.bpool.bpool[base_index][0].read(location[2])
+
+        if (self.tps_list[location[1]] > rid):
+            self.thread.start(target=self.merge, args=base_index)
+            self.thread.join()
 
         if rid == 1:
             base_index = self.bpool.find_page( self.name, True, location[1] , column)
@@ -144,7 +154,7 @@ class Table:
                 self.bpool.mark_dirty(index)
             
             self.base_page_ranges += 1
-            
+
         offset = self.bpool.bpool[index][0].num_records - 1
 
         self.page_directory[record.rid] = [True, self.base_page_ranges-1, offset]
