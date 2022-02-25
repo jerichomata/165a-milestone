@@ -4,7 +4,6 @@ from logging import NullHandler
 from re import X
 from lstore.index import Index
 from lstore.page import Page
-from time import time
 
 import os
 import threading
@@ -90,10 +89,12 @@ class Table:
             base_index = self.bpool.find_page( self.name, True, location[1] , column)
             return self.bpool.bpool[base_index][0].read(location[2])
 
-        location = self.page_directory[rid]
-        index = self.bpool.find_page( self.name, False, location[1], column)
-        print(self.bpool.bpool[index][0].read(location[2]))
-        return self.bpool.bpool[index][0].read(location[2])
+        new_location = self.page_directory[rid]
+        index = self.bpool.find_page( self.name, False, new_location[1], column)
+        offset = (new_location[2])
+        print("")
+        a = self.bpool.bpool[index][0].read(offset)
+        return a
 
 
     def get_value(self, rid, column):
@@ -128,7 +129,7 @@ class Table:
     def add_record(self, record):
         record.columns.insert(INDIRECTION_COLUMN, 1)
         record.columns.insert(RID_COLUMN, record.rid)
-        record.columns.insert(TIMESTAMP_COLUMN, time())
+        record.columns.insert(TIMESTAMP_COLUMN, time.time())
         record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
 
 
@@ -171,7 +172,7 @@ class Table:
 
         record.columns.insert(RID_COLUMN, record.rid)
 
-        record.columns.insert(TIMESTAMP_COLUMN, time())
+        record.columns.insert(TIMESTAMP_COLUMN, time.time())
 
         record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
 

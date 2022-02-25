@@ -21,7 +21,7 @@ records = {}
 
 number_of_records = 1000
 number_of_aggregates = 100
-number_of_updates = 10
+number_of_updates = 3
 
 seed(3562901)
 
@@ -46,11 +46,13 @@ for key in keys:
         # print('select on', key, ':', record)
 print("Select finished")
 
+updates = 0
 # x update on every column
 for _ in range(number_of_updates):
     for key in keys:
         updated_columns = [None, None, None, None, None]
         for i in range(2, grades_table.num_columns):
+            updates += 1
             # updated value
             value = randint(0, 20)
             updated_columns[i] = value
@@ -68,7 +70,7 @@ for _ in range(number_of_updates):
                 print('update error on', original, 'and', updated_columns, ':', record.columns, ', correct:', records[key])
             else:
                 pass
-                # print('update on', original, 'and', updated_columns, ':', record)
+                print('update on', original, 'and', updated_columns, ':', record)
             updated_columns[i] = None
 print("Update finished")
 
