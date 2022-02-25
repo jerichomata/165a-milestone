@@ -79,9 +79,11 @@ class Table:
         location = self.page_directory[base_rid]
 
         base_index = self.bpool.find_page( self.name, True, location[1] , INDIRECTION_COLUMN )
+        self.bpool.pin_page(base_index)
         self.bpool.bpool[base_index][1] = time()
         rid = self.bpool.bpool[base_index][0].read(location[2])
 
+        self.bpool.unpin_page(base_index)
 
         if location[1] not in self.threads.keys():
             self.threads[location[1]] = threading.Thread(target=self.merge, args=(location[1],))
@@ -98,29 +100,37 @@ class Table:
 
         if rid == 1:
             base_index = self.bpool.find_page( self.name, True, location[1] , column)
+            self.bpool.bpool[index][1] = time()
             return self.bpool.bpool[base_index][0].read(location[2])
 
         new_location = self.page_directory[rid]
+
         index = self.bpool.find_page( self.name, new_location[0], new_location[1], column)
+
+        self.bpool.pin_page(index)
         self.bpool.bpool[index][1] = time()
-
-
-        
-        return self.bpool.bpool[index][0].read(new_location[2])
+        value = self.bpool.bpool[index][0].read(new_location[2])
+        self.bpool.unpin_page(index)
+        return value
 
 
     def get_value(self, rid, column):
         location = self.page_directory[rid]
 
         index = self.bpool.find_page(self.name, location[0], location[1] , column)
+        self.bpool.pin_page(index)
         self.bpool.bpool[index][1] = time()
-        return self.bpool.bpool[index][0].read(location[2])
+        value = self.bpool.bpool[index][0].read(location[2])
+        self.bpool.unpin_page(index)
+        return value
 
     def set_value(self, value, rid, column):
         location = self.page_directory[rid]
 
         index = self.bpool.find_page(self.name, location[0], location[1] , column)
+        self.bpool.pin_page(index)
         self.bpool.bpool[index][0].set_value(value, location[2])
+        self.bpool.unpin_page(index)
         self.bpool.mark_dirty(index)
 
     def mpool_get_value(self, base_rid, column):
@@ -167,11 +177,15 @@ class Table:
         
 
         index = self.bpool.find_page(self.name, True, self.base_page_ranges-1, 0)
+        self.bpool.pin_page(index)
         if self.bpool.bpool[index][0].has_capacity():
             for j in range(self.num_columns_hidden):
                 current_index = self.bpool.find_page(self.name, True, self.base_page_ranges-1, j)
+                self.bpool.pin_page(current_index)
                 self.bpool.bpool[current_index][0].write(record.columns[j])
+                self.bpool.unpin_page(current_index)
                 self.bpool.mark_dirty(current_index)
+                index = current_index
                 
         else:
             for j in range(self.num_columns_hidden):
@@ -184,6 +198,7 @@ class Table:
             self.tps_list.append(0)
 
         offset = self.bpool.bpool[index][0].num_records - 1
+        self.bpool.unpin_page(index)
         if (self.base_page_ranges - 1) not in self.original_base_pages:
             self.original_base_pages.append(self.base_page_ranges - 1)
         self.page_directory[record.rid] = [True, self.base_page_ranges-1, offset]
@@ -230,10 +245,13 @@ class Table:
             self.tail_page_ranges = 1
         
         index = self.bpool.find_page(self.name, False, self.tail_page_ranges-1, 0)
+        self.bpool.pin_page(index)
         if self.bpool.bpool[index][0].has_capacity():
             for j in range(self.num_columns_hidden):
                 current_index = self.bpool.find_page(self.name, False, self.tail_page_ranges-1, j)
+                self.bpool.pin_page(current_index)
                 self.bpool.bpool[current_index][0].write(record.columns[j])
+                self.bpool.unpin_page(current_index)
                 self.bpool.mark_dirty(current_index)
                 index = current_index
 
@@ -248,7 +266,7 @@ class Table:
             self.tail_page_ranges += 1
 
         offset = self.bpool.bpool[index][0].num_records - 1
-
+        self.bpool.unpin_page(index)
 
         self.page_directory[new_rid] = [False, self.tail_page_ranges-1, offset]
         self.index.update(record, base_rid)
