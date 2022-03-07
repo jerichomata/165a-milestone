@@ -8,7 +8,7 @@ class bufferpool:
 
     #intialize a 3x5 bufferpool, this is an arbitrary size. 
     def __init__(self):
-        self.MAX_SIZE = 20
+        self.MAX_SIZE = 55
         #bufferpool that stores tuple ( page, time_accessed ).
         self.bpool = []
         self.path = []
@@ -66,12 +66,12 @@ class bufferpool:
     def add_page(self, page):
         if(self.MAX_SIZE > len(self.bpool)):
             page_list = [page,time.time()]
-            self.bpool.append([page,time.time()])
+            self.bpool.append(page_list)
             return page_list
         else:
             self.evict_page()
             page_list = [page,time.time()]
-            self.bpool.append([page,time.time()])
+            self.bpool.append(page_list)
             return page_list
         
     def exist_in_bpool(self, page_type, page_number):
@@ -118,10 +118,10 @@ class bufferpool:
 
         #find first page in pages that that is not pinned.
         for pair in temp:
-            if(pair[0] not in self.pinned_pages and pair[0] not in self.dirty_pages):
+            if(pair not in self.pinned_pages):
                 self.make_clean2(pair[0])
                 self.bpool.remove(pair)
-                return #print("page evicted ", pair[0].name)
+                return # print("page evicted ", pair[0].name)
 
         
 

@@ -55,14 +55,9 @@ class Query:
 
     def select(self, index_value, index_column, query_columns):
         records_objects = []
-        locations = self.table.index.locate(index_value, index_column+4)
+        locations = self.table.index.locate(index_value, index_column)
         for location in locations:
-            columns = []
-            for i, column in enumerate(query_columns):
-                if(column == 1):
-                    columns.append(self.table.get_newest_value(location, i+4))
-                else:
-                    columns.append(None)
+            columns = self.table.get_record(location, query_columns)
             new_record = Record(location, columns[self.table.primary_key_column], columns)
             records_objects.append(new_record)
         return records_objects

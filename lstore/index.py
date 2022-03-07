@@ -29,8 +29,7 @@ class Index:
     def locate(self, value, index = -1):
         if index == -1:
             index = self.table.primary_key_column
-        
-        found_index = self.indices.get(index)
+        found_index = self.indices[index]
         if found_index == None:
             self.create_index(index)
             found_index = len(self.indices) - 1
@@ -52,15 +51,18 @@ class Index:
 
     def locate_range(self, begin, end, index = -1):
         if index == -1:
-            index = self.primary_key_column
+            index = self.table.primary_key_column
 
         found_index = self.indices.get(index)
         if found_index == None:
             self.create_index(index)
             found_index = len(self.indices) - 1
-        
-        range_of_index = dict(itertools.islice(self.indices[found_index].items(), begin, end))
-        return [x for x in range_of_index.values]
+
+        keys_in_range = [key for key in found_index.keys() if begin <= key <= end]
+
+        rids = [found_index[key] for key in keys_in_range]
+        rids = [rid for sublist in rids for rid in sublist]
+        return rids
             
 
     def update(self, schema_encoding, new_record, base_rid):
@@ -78,10 +80,13 @@ class Index:
                     self.indices[i][new_record.columns[i]] = [base_rid]
 
     def drop_record(self, base_rid):
-        for dictionary in self.indices.values():
-            listOfValues = list(dictionary.keys())
-            listOfRids = list(dictionary.values())
-            del dictionary[listOfValues[listOfRids.index(base_rid)]]
+        for key, value in self.indices.items():
+            value_at_base_rid = self.table.get_newest_value(base_rid, key+4)
+            value[value_at_base_rid].remove(base_rid)
+            if len(value[value_at_base_rid]) == 0:
+                del value[value_at_base_rid]
+
+            
 
 
 
