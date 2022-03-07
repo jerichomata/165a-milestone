@@ -11,16 +11,16 @@ class Index:
     def __init__(self, table):
         # One index for each table. All our empty initially.
         self.table = table
-        self.indices = {self.table.primary_key_column_hidden:{}}
+        self.indices = {self.table.primary_key_column:{}}
         pass      
         
 
     def insert(self, record, base_rid):
         for key, value in self.indices.items():
-            if record.columns[key] in value.keys():
-                value[record.columns[key]].append(base_rid)
+            if record.columns[key+4] in value.keys():
+                value[record.columns[key+4]].append(base_rid)
             else:
-                value[record.columns[key]] = [base_rid]
+                value[record.columns[key+4]] = [base_rid]
 
     """
     # returns the location of all records with the given value on column "column"
@@ -28,14 +28,14 @@ class Index:
 
     def locate(self, value, index = -1):
         if index == -1:
-            index = self.table.primary_key_column_hidden
+            index = self.table.primary_key_column
         
         found_index = self.indices.get(index)
         if found_index == None:
             self.create_index(index)
             found_index = len(self.indices) - 1
 
-        found_rid = self.indices[found_index].get(value)
+        found_rid = found_index.get(value)
         if found_rid == None:
             print("could not find", value, "in", index)
             return None
@@ -52,7 +52,7 @@ class Index:
 
     def locate_range(self, begin, end, index = -1):
         if index == -1:
-            index = self.primary_key_column_hidden
+            index = self.primary_key_column
 
         found_index = self.indices.get(index)
         if found_index == None:
@@ -62,21 +62,41 @@ class Index:
         range_of_index = dict(itertools.islice(self.indices[found_index].items(), begin, end))
         return [x for x in range_of_index.values]
             
-    #TODO
-    def update(self, old_record, new_record, base_rid):
-        pass
+
+    def update(self, schema_encoding, new_record, base_rid):
+
+        for i, bit in enumerate(schema_encoding):
+            if bit == 1:
+
+                listOfValues = list(self.indices[i].keys())
+                listOfRids = list(self.indices[i].values())
+                del self.indices[i][listOfValues[listOfRids.index(base_rid)]]
+
+                if new_record.columns[i] in self.indices[i].keys():
+                    self.indices[i][new_record.columns[i]].append(base_rid)
+                else:
+                    self.indices[i][new_record.columns[i]] = [base_rid]
+
+    def drop_record(self, base_rid):
+        for dictionary in self.indices.values():
+            listOfValues = list(dictionary.keys())
+            listOfRids = list(dictionary.values())
+            del dictionary[listOfValues[listOfRids.index(base_rid)]]
+
+
+
 
     """
     # optional: Create index on specific column
     """
 
     def create_index(self, column_number):
-        self.indices_references.append(column_number)
         new_index = {}
-        for rid in self.indices[0].values():
-            new_index[self.table.get_newest_value(rid, column_number)] = [rid]
+        for entry in self.indices[self.table.primary_key_column].values():
+            for rid in entry:
+                new_index[self.table.get_newest_value(rid, column_number+4)] = [rid]
 
-        self.indices.append(new_index)
+        self.indices[column_number] = new_index
 
 
     """
@@ -84,7 +104,4 @@ class Index:
     """
 
     def drop_index(self, column_number):
-        index = self.indices_references.find(column_number)
-        if index > -1:
-            del self.indices_references[index]
-            del self.indices[index]
+        del self.indices[column_number]

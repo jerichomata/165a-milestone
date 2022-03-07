@@ -43,16 +43,24 @@ class Table:
     def __init__(self, name="table", num_columns=1, key=0, bpool=bufferpool()):
         self.name = name
         self.threads = {}
+
         self.primary_key_column = key
         self.primary_key_column_hidden = key + 4
+
         self.num_columns = num_columns
         self.num_columns_hidden = num_columns + 4
+
         self.current_rid = 1
         self.num_records = 0
+
         self.page_directory = {}
+
         self.original_base_pages = []
-        self.base_page_ranges = 0
-        self.tail_page_ranges = 0
+        self.base_pages = 0
+        self.tail_pages = 0
+        self.newest_base_pages = {}
+        self.newest_tail_pages = {}
+
         self.merged_base_page_ranges = 0
         self.index = Index(self)
         self.bpool = bpool
@@ -90,62 +98,90 @@ class Table:
 
     def get_newest_value(self, base_rid, column):
 
-        location = self.page_directory[base_rid]
+        base_location = self.page_directory[base_rid]
+        
+        base_pages = base_location['pages']
+        base_offsets = base_location['offsets']
 
-        base_index = self.bpool.find_page( self.name, True, location[1] , INDIRECTION_COLUMN )
-        self.bpool.pin_page(base_index)
-        self.bpool.bpool[base_index][1] = time()
-        rid = self.bpool.bpool[base_index][0].read(location[2])
+        base_indirection = self.bpool.find_page(self.name, True, base_pages[INDIRECTION_COLUMN])
+        self.bpool.pin_page(base_indirection)
+        base_indirection[1] = time()
+        indirection_rid = base_indirection[0].read(base_offsets[INDIRECTION_COLUMN])
+        self.bpool.unpin_page(base_indirection)
 
-        self.bpool.unpin_page(base_index)
+        base_schema_encoding = self.bpool.find_page( self.name, True, base_pages[SCHEMA_ENCODING_COLUMN])
+        self.bpool.pin_page(base_schema_encoding)
+        base_schema_encoding[1] = time()
+        base_schema_encoding_value = format(base_schema_encoding[0].read(base_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
+        self.bpool.unpin_page(base_schema_encoding)
 
-        if location[1] not in self.threads.keys():
-            self.threads[location[1]] = threading.Thread(target=self.merge, args=(location[1],))
-            if rid - 1024 > self.tps_list[location[1]] and not self.threads[location[1]].is_alive():
-                self.bpool.make_clean()
-                self.threads[location[1]].start()
-        elif self.threads[location[1]].is_alive():
-            self.threads[location[1]].join()
-        elif (rid - 1024 > self.tps_list[location[1]] and not self.threads[location[1]].is_alive()):
-            self.bpool.make_clean()
-            self.threads[location[1]] = threading.Thread(target=self.merge, args=(location[1],))
-            self.threads[location[1]].start()
+        if indirection_rid == 1 or base_schema_encoding_value[column] == 0:
+            base_column_page = self.bpool.find_page( self.name, True, base_pages[column])
+            self.bpool.pin_page(base_column_page)
+            base_column_page[1] = time()
+            value = base_column_page[0].read(base_offsets[column])
+            self.bpool.unpin_page(base_column_page)
+            return value
 
 
-        if rid == 1:
-            base_index = self.bpool.find_page( self.name, True, location[1] , column)
-            self.bpool.bpool[base_index][1] = time()
-            return self.bpool.bpool[base_index][0].read(location[2])
+        tail_location = self.page_directory[indirection_rid]
+        while(indirection_rid != base_rid):
+            tail_pages = tail_location['pages']
+            tail_offsets = tail_location['offsets']
 
-        new_location = self.page_directory[rid]
+            tail_schema_encoding = self.bpool.find_page( self.name, False, tail_pages[SCHEMA_ENCODING_COLUMN])
+            self.bpool.pin_page(tail_schema_encoding)
+            tail_schema_encoding[1] = time()
+            tail_schema_encoding_value = format(tail_schema_encoding[0].read(tail_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
+            self.bpool.unpin_page(tail_schema_encoding)
 
-        index = self.bpool.find_page( self.name, new_location[0], new_location[1], column)
+            if tail_schema_encoding_value[column] == 1:
+                tail_column_page = self.bpool.find_page( self.name, False, tail_pages[column])
+                self.bpool.pin_page(tail_column_page)
+                tail_column_page[1] = time()
+                value = tail_column_page[0].read(tail_offsets[column])
+                self.bpool.unpin_page(tail_column_page)
+                return value
+            else:
+                tail_indirection = self.bpool.find_page(self.name, False, tail_pages[INDIRECTION_COLUMN])
+                self.bpool.pin_page(tail_indirection)
+                tail_indirection[1] = time()
+                rid = tail_indirection[0].read(tail_offsets[INDIRECTION_COLUMN])
+                tail_location = self.page_directory[rid]
+                self.bpool.unpin_page(tail_indirection)
 
-        self.bpool.pin_page(index)
-        self.bpool.bpool[index][1] = time()
-        value = self.bpool.bpool[index][0].read(new_location[2])
-        self.bpool.unpin_page(index)
-        return value
+        return None
 
 
     def get_value(self, rid, column):
         location = self.page_directory[rid]
+        pages = location['pages']
+        offsets = location['offsets']
 
-        index = self.bpool.find_page(self.name, location[0], location[1] , column)
-        self.bpool.pin_page(index)
-        self.bpool.bpool[index][1] = time()
-        value = self.bpool.bpool[index][0].read(location[2])
-        self.bpool.unpin_page(index)
+
+        page = self.bpool.find_page(self.name, location['base'], pages[column])
+
+        self.bpool.pin_page(page)
+        page[1] = time()
+        value = page[0].read(offsets[column])
+        self.bpool.unpin_page(page)
+
         return value
 
     def set_value(self, value, rid, column):
-        location = self.page_directory[rid]
 
-        index = self.bpool.find_page(self.name, location[0], location[1] , column)
-        self.bpool.pin_page(index)
-        self.bpool.bpool[index][0].set_value(value, location[2])
-        self.bpool.unpin_page(index)
-        self.bpool.mark_dirty(index)
+        location = self.page_directory[rid]
+        pages = location['pages']
+        offsets = location['offsets']
+
+        page = self.bpool.find_page(self.name, location['base'], pages[column])
+
+        self.bpool.pin_page(page)
+        page[1] = time()
+        value = page[0].set_value(value, offsets[column])
+        self.bpool.mark_dirty(page)
+        self.bpool.unpin_page(page)
+
 
     def mpool_get_value(self, base_rid, column):
         location = self.page_directory[base_rid]
@@ -182,41 +218,62 @@ class Table:
         record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
 
 
-        if self.base_page_ranges == 0:
+        if self.base_pages == 0:
             for i in range(self.num_columns_hidden):
-                self.bpool.add_page(Page("B" + str(self.base_page_ranges) + "-" + str(i), self.name))
-            self.base_page_ranges = 1
+                self.base_pages += 1
+                index = self.bpool.add_page(Page("B" + str(self.base_pages),self.name))
+                self.bpool.mark_dirty(index)
+                self.newest_base_pages[i] = self.base_pages
             self.tps_list.append(0)
 
+        added_new_base_page_range = False
+        pages = {}
+        offsets = {}
+        for column_index in range(self.num_columns_hidden):
+            #grab newest base page from pool
+            page = self.bpool.find_page(self.name, True, self.newest_base_pages[column_index])[0]
+
+            #check if page has space
+            if page.has_capacity():
+
+                #pin the page then add to pages and offsets dictionary where value was written
+                self.bpool.pin_page(page)
+                pages[column_index] = self.newest_base_pages[column_index]
+                offsets[column_index] = page.write(record.columns[column_index])
+
+                #unpin and mark dirty
+                self.bpool.unpin_page(page)
+                self.bpool.mark_dirty(page)
+            else:
+
+                #increment number of pages and make a new page
+                self.base_pages += 1
+                page = Page("B" + str(self.base_pages), self.name)
+
+                #add to pages and offsets dictionary where value was written
+                pages[column_index] = self.base_pages
+                offsets[column_index] = page.write(record.columns[column_index])
+
+                #add page to pool and mark dirty
+                new_page_in_pool = self.bpool.add_page(page)
+                self.bpool.mark_dirty(new_page_in_pool)
+
+                #update newest base pages at this column index to be this new page that was created
+                self.newest_base_pages[column_index] = self.base_pages
+                added_new_base_page_range = True
+
+        # add to tps list for new base page range if a new base page range was created.
+        if added_new_base_page_range:
+            self.tps_list.append(0)
         
 
-        index = self.bpool.find_page(self.name, True, self.base_page_ranges-1, 0)
-        self.bpool.pin_page(index)
-        if self.bpool.bpool[index][0].has_capacity():
-            for j in range(self.num_columns_hidden):
-                current_index = self.bpool.find_page(self.name, True, self.base_page_ranges-1, j)
-                self.bpool.pin_page(current_index)
-                self.bpool.bpool[current_index][0].write(record.columns[j])
-                self.bpool.unpin_page(current_index)
-                self.bpool.mark_dirty(current_index)
-                index = current_index
-                
-        else:
-            for j in range(self.num_columns_hidden):
-                page = Page("B" + str(self.base_page_ranges) + "-" + str(j), self.name)
-                page.write(record.columns[j])
-                index = self.bpool.add_page(page)
-                self.bpool.mark_dirty(index)
-            
-            self.base_page_ranges += 1
-            self.tps_list.append(0)
+        # keep track of original base pages
+        for page in pages:
+            if page not in self.original_base_pages:
+                self.original_base_pages.append(page)
 
-        offset = self.bpool.bpool[index][0].num_records - 1
-        self.bpool.unpin_page(index)
-        if (self.base_page_ranges - 1) not in self.original_base_pages:
-            self.original_base_pages.append(self.base_page_ranges - 1)
-        self.page_directory[record.rid] = [True, self.base_page_ranges-1, offset]
-        self.index.sorted_insert(record, record.rid)
+        self.page_directory[record.rid] = {'base':True, 'pages':pages, 'offsets':offsets}
+        self.index.insert(record, record.rid)
 
 
     def update_record(self, record, base_rid):
@@ -234,56 +291,83 @@ class Table:
 
         record.columns.insert(TIMESTAMP_COLUMN, time())
 
-        record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
+        
 
         schema_encoding = ""
+        schema_encoding_base = format(self.get_value(base_rid, SCHEMA_ENCODING_COLUMN), "064b")
 
-        for i in range(self.num_columns_hidden):
+        for i in range(self.num_columns):
             if(record.columns[i] == None):
-                record.columns[i] = self.get_value(old_base_indirection, i)
                 schema_encoding += "0"
             else:
+                schema_encoding_base = schema_encoding_base[:i] + "1" + schema_encoding_base[i+1:]
                 schema_encoding += "1"
 
-        for i in range(self.num_columns_hidden,64):
-            schema_encoding += "0"
-
-        self.set_value(int(schema_encoding,2), old_base_indirection, SCHEMA_ENCODING_COLUMN)
+        schema_encoding_64 = schema_encoding
+        for i in range(self.num_columns,64):
+            schema_encoding_64 += "0"
+        
+        record.columns.insert(SCHEMA_ENCODING_COLUMN, int(schema_encoding_64,2))
+        self.set_value(int(schema_encoding_base,2), base_rid, SCHEMA_ENCODING_COLUMN)
 
         #Set indirection column on base page to point to this record.
         self.set_value(new_rid, base_rid, INDIRECTION_COLUMN)
 
-        if self.tail_page_ranges == 0:
+        if self.tail_pages == 0:
             for i in range(self.num_columns_hidden):
-                self.bpool.add_page(Page("T" + str(self.tail_page_ranges) + "-" + str(i), self.name))
-            self.tail_page_ranges = 1
-        
-        index = self.bpool.find_page(self.name, False, self.tail_page_ranges-1, 0)
-        self.bpool.pin_page(index)
-        if self.bpool.bpool[index][0].has_capacity():
-            for j in range(self.num_columns_hidden):
-                current_index = self.bpool.find_page(self.name, False, self.tail_page_ranges-1, j)
-                self.bpool.pin_page(current_index)
-                self.bpool.bpool[current_index][0].write(record.columns[j])
-                self.bpool.unpin_page(current_index)
-                self.bpool.mark_dirty(current_index)
-                index = current_index
-
-                
-        else:
-            for j in range(self.num_columns_hidden):
-                page = Page("T" + str(self.tail_page_ranges) + "-" + str(j), self.name)
-                page.write(record.columns[j])
-                index = self.bpool.add_page(page)
+                self.tail_pages += 1
+                index = self.bpool.add_page(Page("T" + str(self.tail_pages), self.name))
                 self.bpool.mark_dirty(index)
+                self.newest_tail_pages[i] = self.tail_pages
+            
+        
+        
+        pages = {}
+        offsets = {}
+        for column_index in range(self.num_columns_hidden):
+            #Check if value exists based on schema_encoding
+            if schema_encoding[column_index-4] == 1 or column_index < 4:
 
-            self.tail_page_ranges += 1
+                #Grab page newest tail page in bpool
+                page = self.bpool.find_page(self.name, False, self.newest_tail_pages[column_index])[0]
 
-        offset = self.bpool.bpool[index][0].num_records - 1
-        self.bpool.unpin_page(index)
+                #Check if page has capacity
+                if page.has_capacity():
 
-        self.page_directory[new_rid] = [False, self.tail_page_ranges-1, offset]
-        self.index.update(record, base_rid)
+                    #pin page
+                    self.bpool.pin_page(page)
+
+                    #add to pages and offsets for page directory
+                    pages[column_index] = self.newest_tail_pages[column_index]
+                    offsets[column_index] = page.write(record.columns[column_index])
+
+                    #unpin and mark dirty
+                    self.bpool.unpin_page(page)
+                    self.bpool.mark_dirty(page)
+
+                else:
+                    #increment number of tail pages and make new page
+                    self.tail_pages += 1
+                    page = Page("T" + str(self.tail_pages), self.name)
+
+                    #add to pages and offsets for page directory
+                    pages[column_index] = self.tail_pages
+                    offsets[column_index] = page.write(record.columns[column_index])
+
+                    #add page to pool and mark dirty
+                    new_page_in_pool = self.bpool.add_page(page)
+                    self.bpool.mark_dirty(new_page_in_pool)
+
+                    #update newest tail page
+                    self.newest_tail_pages[column_index] = self.tail_pages
+
+            else:
+                pages[column_index] = None
+                offsets[column_index] = None
+
+
+        self.page_directory[new_rid] = {'base':False, 'pages':pages, 'offsets':offsets}
+        self.index.update(schema_encoding, record, base_rid)
 
 
     def delete_record(self, key):
