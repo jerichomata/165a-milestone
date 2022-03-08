@@ -1,3 +1,4 @@
+from msilib import schema
 from lstore.index import Index
 from lstore.page import Page
 from lstore.bpool import bufferpool
@@ -72,12 +73,12 @@ class Table:
     def __getstate__(self):
         return (self.name, self.primary_key_column, self.primary_key_column_hidden, 
             self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, 
-            self.original_base_pages, self.base_page_ranges, self.tail_page_ranges, self.merged_base_page_ranges,
+            self.original_base_pages, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages, self.merged_base_page_ranges,
             self.index, self.bpool, self.mpool, self.tps_list)
     
     def __setstate__(self, state):
 
-        self.name, self.primary_key_column, self.primary_key_column_hidden, self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.original_base_pages, self.base_page_ranges, self.tail_page_ranges, self.merged_base_page_ranges, self.index, self.bpool, self.mpool, self.tps_list = state
+        self.name, self.primary_key_column, self.primary_key_column_hidden, self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.original_base_pages, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages, self.merged_base_page_ranges, self.index, self.bpool, self.mpool, self.tps_list = state
 
         self.threading_lock = threading.Lock()
         self.threads = {}
@@ -115,7 +116,7 @@ class Table:
         base_schema_encoding_value = format(base_schema_encoding[0].read(base_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
         self.bpool.unpin_page(base_schema_encoding)
 
-        if indirection_rid == 1 or base_schema_encoding_value[column] == 0:
+        if indirection_rid == 1 or base_schema_encoding_value[column-4] == '0':
             base_column_page = self.bpool.find_page( self.name, True, base_pages[column])
             self.bpool.pin_page(base_column_page)
             base_column_page[1] = time()
@@ -125,7 +126,7 @@ class Table:
 
 
         tail_location = self.page_directory[indirection_rid]
-        while(indirection_rid != base_rid):
+        while(True):
             tail_pages = tail_location['pages']
             tail_offsets = tail_location['offsets']
 
@@ -135,7 +136,7 @@ class Table:
             tail_schema_encoding_value = format(tail_schema_encoding[0].read(tail_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
             self.bpool.unpin_page(tail_schema_encoding)
 
-            if tail_schema_encoding_value[column] == 1:
+            if tail_schema_encoding_value[column-4] == '1':
                 tail_column_page = self.bpool.find_page( self.name, False, tail_pages[column])
                 self.bpool.pin_page(tail_column_page)
                 tail_column_page[1] = time()
@@ -146,16 +147,27 @@ class Table:
                 tail_indirection = self.bpool.find_page(self.name, False, tail_pages[INDIRECTION_COLUMN])
                 self.bpool.pin_page(tail_indirection)
                 tail_indirection[1] = time()
-                rid = tail_indirection[0].read(tail_offsets[INDIRECTION_COLUMN])
-                tail_location = self.page_directory[rid]
+                indirection_rid = tail_indirection[0].read(tail_offsets[INDIRECTION_COLUMN])
+                
+                if indirection_rid == base_rid:
+                    break
+                tail_location = self.page_directory[indirection_rid]
                 self.bpool.unpin_page(tail_indirection)
 
         return None
 
     def get_record(self, base_rid, query_columns):
         return_query_columns = query_columns
+<<<<<<< HEAD
         number_of_values_queried = query_columns.count(1)
         actual_number_of_values_queried = 0
+=======
+        number_of_values_queried = len(query_columns)
+        for i in range(len(query_columns)):
+            if query_columns[i] == 0:
+                number_of_values_queried -= 1
+                return_query_columns = None 
+>>>>>>> parent of b54c7a5 (Revert "improved speed drastically ready for m3")
 
         base_location = self.page_directory[base_rid]
         
@@ -173,7 +185,11 @@ class Table:
         base_schema_encoding[1] = time()
         base_schema_encoding_value = format(base_schema_encoding[0].read(base_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
         self.bpool.unpin_page(base_schema_encoding)
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> parent of b54c7a5 (Revert "improved speed drastically ready for m3")
         for column, i in enumerate(query_columns):
             if i != 0:
                 if indirection_rid == 1 or base_schema_encoding_value[column] == '0':
@@ -183,11 +199,21 @@ class Table:
                     value = base_column_page[0].read(base_offsets[column+4])
                     self.bpool.unpin_page(base_column_page)
                     return_query_columns[column] = value
+<<<<<<< HEAD
                     actual_number_of_values_queried += 1
         
         
         
         if actual_number_of_values_queried == number_of_values_queried:
+=======
+                    
+        correct_columns = 0
+        for i in range(len(query_columns)):
+            if query_columns[i] == 0 and return_query_columns[i] == None:
+                correct_columns += 1
+        
+        if len(query_columns)-correct_columns == number_of_values_queried:
+>>>>>>> parent of b54c7a5 (Revert "improved speed drastically ready for m3")
             return return_query_columns
         
         next_indirection = indirection_rid
@@ -213,10 +239,21 @@ class Table:
                         value = tail_column_page[0].read(tail_offsets[column+4])
                         self.bpool.unpin_page(tail_column_page)
                         return_query_columns[column] = value
+<<<<<<< HEAD
                         actual_number_of_values_queried += 1
 
             if actual_number_of_values_queried == number_of_values_queried:
                 return return_query_columns
+=======
+
+            correct_columns = 0
+            for i in range(len(query_columns)):
+                if query_columns[i] == 0 and return_query_columns[i] == None:
+                    correct_columns += 1
+            
+            if len(query_columns)-correct_columns == number_of_values_queried:
+                break
+>>>>>>> parent of b54c7a5 (Revert "improved speed drastically ready for m3")
             
         
             tail_indirection = self.bpool.find_page(self.name, False, tail_pages[INDIRECTION_COLUMN])
@@ -227,6 +264,10 @@ class Table:
             
             self.bpool.unpin_page(tail_indirection)
 
+<<<<<<< HEAD
+=======
+        return return_query_columns
+>>>>>>> parent of b54c7a5 (Revert "improved speed drastically ready for m3")
 
 
     def get_value(self, rid, column):
@@ -373,12 +414,13 @@ class Table:
         schema_encoding_base = format(self.get_value(base_rid, SCHEMA_ENCODING_COLUMN), "064b")
 
         for i in range(self.num_columns):
-            if(record.columns[i] == None):
+            if(record.columns[i+3] == None):
                 schema_encoding += "0"
             else:
                 schema_encoding_base = schema_encoding_base[:i] + "1" + schema_encoding_base[i+1:]
                 schema_encoding += "1"
 
+        
         schema_encoding_64 = schema_encoding
         for i in range(self.num_columns,64):
             schema_encoding_64 += "0"
@@ -400,19 +442,54 @@ class Table:
         
         pages = {}
         offsets = {}
-        for column_index in range(self.num_columns_hidden):
+        for column_index in range(4):
+
+            #Grab page newest tail page in bpool
+            page = self.bpool.find_page(self.name, False, self.newest_tail_pages[column_index])[0]
+            
+            #Check if page has capacity
+            if page.has_capacity():
+
+                #pin page
+                self.bpool.pin_page(page)
+
+                #add to pages and offsets for page directory
+                pages[column_index] = self.newest_tail_pages[column_index]
+                offsets[column_index] = page.write(record.columns[column_index])
+
+                #unpin and mark dirty
+                self.bpool.unpin_page(page)
+                self.bpool.mark_dirty(page)
+
+            else:
+                #increment number of tail pages and make new page
+                self.tail_pages += 1
+                page = Page("T" + str(self.tail_pages), self.name)
+
+                #add to pages and offsets for page directory
+                pages[column_index] = self.tail_pages
+                offsets[column_index] = page.write(record.columns[column_index])
+
+                #add page to pool and mark dirty
+                new_page_in_pool = self.bpool.add_page(page)
+                self.bpool.mark_dirty(new_page_in_pool)
+
+                #update newest tail page
+                self.newest_tail_pages[column_index] = self.tail_pages
+
+        for column_index in range(4, self.num_columns_hidden):
             #Check if value exists based on schema_encoding
-            if schema_encoding[column_index-4] == 1 or column_index < 4:
+            if schema_encoding[column_index-4] == '1':
 
                 #Grab page newest tail page in bpool
                 page = self.bpool.find_page(self.name, False, self.newest_tail_pages[column_index])[0]
-
+                
                 #Check if page has capacity
                 if page.has_capacity():
 
                     #pin page
                     self.bpool.pin_page(page)
-
+                    
                     #add to pages and offsets for page directory
                     pages[column_index] = self.newest_tail_pages[column_index]
                     offsets[column_index] = page.write(record.columns[column_index])
