@@ -5,6 +5,7 @@ class Logger:
     def init(self):
         self.current_transaction = 0
         self.logger_dictionary = {}
+
         pass
 
     # self.logger_dictionary[transaction_id] = {["function", old_rid, old_key, new_rid, new_key, commit_bool]}
@@ -13,6 +14,7 @@ class Logger:
         log = open('log', 'a')
         pickle.dump(self.logger_dictionary, log)
         log.close()
+
         pass
 
     def log_update(self, record, new_record):
@@ -20,6 +22,7 @@ class Logger:
         log = open('log', 'a')
         pickle.dump(self.logger_dictionary, log)
         log.close()
+
         pass
 
     def log_delete(self, record):
@@ -27,6 +30,7 @@ class Logger:
         log = open('log', 'a')
         pickle.dump(self.logger_dictionary, log)
         log.close()
+
         pass
 
     def log_commit(self, transaction_id):
@@ -34,6 +38,7 @@ class Logger:
         log = open('log', 'a')
         pickle.dump(self.logger_dictionary, log)
         log.close()
+
         pass
 
     def log_abort(self, transaction_id):
@@ -41,5 +46,6 @@ class Logger:
         log = open('log', 'a')
         pickle.dump(self.logger_dictionary, log)
         log.close()
+        
         pass
 
