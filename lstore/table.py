@@ -158,11 +158,8 @@ class Table:
 
     def get_record(self, base_rid, query_columns):
         return_query_columns = query_columns
-        number_of_values_queried = len(query_columns)
-        for i in range(len(query_columns)):
-            if query_columns[i] == 0:
-                number_of_values_queried -= 1
-                return_query_columns = None 
+        number_of_values_queried = query_columns.count(1)
+        actual_number_of_values_queried = 0
 
         base_location = self.page_directory[base_rid]
         
@@ -180,7 +177,7 @@ class Table:
         base_schema_encoding[1] = time()
         base_schema_encoding_value = format(base_schema_encoding[0].read(base_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
         self.bpool.unpin_page(base_schema_encoding)
-
+        
         for column, i in enumerate(query_columns):
             if i != 0:
                 if indirection_rid == 1 or base_schema_encoding_value[column] == '0':
@@ -190,13 +187,11 @@ class Table:
                     value = base_column_page[0].read(base_offsets[column+4])
                     self.bpool.unpin_page(base_column_page)
                     return_query_columns[column] = value
-                    
-        correct_columns = 0
-        for i in range(len(query_columns)):
-            if query_columns[i] == 0 and return_query_columns[i] == None:
-                correct_columns += 1
+                    actual_number_of_values_queried += 1
         
-        if len(query_columns)-correct_columns == number_of_values_queried:
+        
+        
+        if actual_number_of_values_queried == number_of_values_queried:
             return return_query_columns
         
         next_indirection = indirection_rid
@@ -222,14 +217,10 @@ class Table:
                         value = tail_column_page[0].read(tail_offsets[column+4])
                         self.bpool.unpin_page(tail_column_page)
                         return_query_columns[column] = value
+                        actual_number_of_values_queried += 1
 
-            correct_columns = 0
-            for i in range(len(query_columns)):
-                if query_columns[i] == 0 and return_query_columns[i] == None:
-                    correct_columns += 1
-            
-            if len(query_columns)-correct_columns == number_of_values_queried:
-                break
+            if actual_number_of_values_queried == number_of_values_queried:
+                return return_query_columns
             
         
             tail_indirection = self.bpool.find_page(self.name, False, tail_pages[INDIRECTION_COLUMN])
@@ -240,7 +231,6 @@ class Table:
             
             self.bpool.unpin_page(tail_indirection)
 
-        return return_query_columns
 
 
     def get_value(self, rid, column):
