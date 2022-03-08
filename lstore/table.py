@@ -44,7 +44,7 @@ class Table:
     def __init__(self, name="table", num_columns=1, key=0, bpool=bufferpool()):
         self.name = name
         self.threads = {}
-
+        self.record_lock = {}
         self.primary_key_column = key
         self.primary_key_column_hidden = key + 4
 
@@ -82,6 +82,9 @@ class Table:
 
         self.threading_lock = threading.Lock()
         self.threads = {}
+
+    def set_record_lock(self, base_rid, lock_value):
+        self.record_lock[base_rid] = lock_value
 
     def get_base_rid(self, rid):
         current_rid = rid
@@ -306,6 +309,7 @@ class Table:
         record.columns.insert(RID_COLUMN, record.rid)
         record.columns.insert(TIMESTAMP_COLUMN, time())
         record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
+        self.record_lock[record.rid] = "False"
 
 
         if self.base_pages == 0:
