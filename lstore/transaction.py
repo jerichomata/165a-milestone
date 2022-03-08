@@ -8,6 +8,8 @@ class Transaction:
     """
     def __init__(self):
         self.queries = []
+        self.s_locks = []
+        self.x_locks = []
         pass
 
     """
@@ -30,11 +32,24 @@ class Transaction:
                 return self.abort()
         return self.commit()
 
+
+    #about should be called when there is a deadlock or if there is a crash.
     def abort(self):
         #TODO: do roll-back and any other necessary operations
+
         return False
 
+    # commit should be called when all the lock have been released and there are no more queries
+    # durring a commit all the write queries should be committed to disk
     def commit(self):
-        # TODO: commit to database
+         # TODO: commit to database
+        for query in self.queries:
+            if query[0] == q.update:
+
+            elif query[0] == q.insert:
+                 
+            elif query[0] == q.delete:
+                
+
         return True
 
