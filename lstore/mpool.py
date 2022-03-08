@@ -4,11 +4,11 @@ import struct
 import time
 import os
 
-class bufferpool:
+class mergepool:
 
     #intialize a 3x5 bufferpool, this is an arbitrary size. 
     def __init__(self):
-        self.MAX_SIZE = 20
+        self.MAX_SIZE = 55
         #bufferpool that stores tuple ( page, time_accessed ).
         self.bpool = []
         self.path = []
@@ -66,12 +66,12 @@ class bufferpool:
     def add_page(self, page):
         if(self.MAX_SIZE > len(self.bpool)):
             page_list = [page,time.time()]
-            self.bpool.append([page,time.time()])
+            self.bpool.append(page_list)
             return page_list
         else:
             self.evict_page()
             page_list = [page,time.time()]
-            self.bpool.append([page,time.time()])
+            self.bpool.append(page_list)
             return page_list
         
     def exist_in_bpool(self, page_type, page_number):
@@ -82,12 +82,9 @@ class bufferpool:
                 
         return -1 
 
-    def find_page(self, table_name, prefix, page_number):
+    def find_page(self, table_name, page_number):
         cwd = os.getcwd()
-        page_type = "B"
-        if(not prefix):
-            page_type = "T"
-
+        page_type = "MP"
         exist_index = self.exist_in_bpool(page_type, page_number)
 
         if(exist_index > -1):
@@ -103,26 +100,3 @@ class bufferpool:
 
 
         return self.add_page(page_find)
-
-    #evict page based on Least Recently Used page. 
-    def evict_page(self):
-
-        #before any pages can be evicted we must make all pages clean so that no uncommited changes are lost.
-        # self.make_clean()
-        #loop through bpool and sort the pages by recent usage, find the least recently used page that is unpinned and evict.
-        #if all pages are pinned, (for whatever reason), return error code/msg.
-
-        #since it's a tuple, we can just sort by 
-        temp = self.bpool.copy()
-        temp.sort(key = lambda x: x[1])
-
-        #find first page in pages that that is not pinned.
-        for pair in temp:
-            if(pair[0] not in self.pinned_pages and pair[0] not in self.dirty_pages):
-                self.make_clean2(pair[0])
-                self.bpool.remove(pair)
-                return #print("page evicted ", pair[0].name)
-
-        
-
-        return print("all of the pages in the bufferpool are pinned. ")    
