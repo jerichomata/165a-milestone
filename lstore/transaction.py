@@ -37,15 +37,10 @@ class Transaction:
             self.threading_lock.acquire()
             can_execute = self.lock_switch(args[0].check_lock)
             if(can_execute):
-                
                 self.threading_lock.release()
                 result = query(args)
-    
-
-
-
             # If the query has failed the transaction should abort
-            if result == False:
+            if result == False or can_execute == False:
                 return self.abort()
         return self.commit()
 
