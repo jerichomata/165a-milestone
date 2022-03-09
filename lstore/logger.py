@@ -14,13 +14,15 @@ class Logger:
     # self.logger_dictionary[transaction_id] = {["function", old_rid, old_key, new_rid, new_key, commit_bool]}
     def log_write(self, new_record):
         self.current_transaction+=1
-        self.logger_dictionary[self.current_transaction] = {'operation': "write", 'rid': new_record.rid, 'key': new_record.key , 'commited': False, 'aborted': False}
+        self.logger_dictionary[self.current_transaction] = {'operation': "write", 'rid': new_record.rid, 'key': record. , 'commited': False, 'aborted': False}
         with open(self.path, 'wb') as file:
             pickle.dump(self.logger_dictionary, file)
 
     def log_update(self, record, new_record):
         self.current_transaction+=1
-        self.logger_dictionary[self.current_transaction] = {'operation': "update", 'rid': new_record.rid, 'key': new_record.key , 'commited': False, 'aborted': False}
+        updated_columns = len(record.columns)-4
+        indirection_column = len(record.columns)-3
+        self.logger_dictionary[self.current_transaction] = {'operation': "update", 'key': record.key, 'old_rid': record.rid, 'indirection': record.columns[indirection_column], 'schema': record.columns[-1], 'rid': new_record.rid , 'query': new_record.columns[:updated_columns], 'commited': False, 'aborted': False}
         with open(self.path, 'wb') as file:
             pickle.dump(self.logger_dictionary, file)
 
