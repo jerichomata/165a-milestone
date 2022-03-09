@@ -1,5 +1,13 @@
 from lstore.table import Table, Record
 from lstore.index import Index
+from lstore.logger import Logger
+import threading
+
+
+#check_lock -> go to hashtable, 
+#make_shared
+#make_lock
+#make_unlock
 
 class Transaction:
 
@@ -8,6 +16,7 @@ class Transaction:
     """
     def __init__(self):
         self.queries = []
+        self.threading_lock = threading.Lock()
         pass
 
     """
@@ -24,22 +33,38 @@ class Transaction:
     # If you choose to implement this differently this method must still return True if transaction commits or False on abort
     def run(self):
         for query, args in self.queries:
-            result = query(*args)
+            #Acquire the lock to check if the record is ok to continue
+            self.threading_lock.acquire()
+            can_execute = self.lock_switch(args[0].check_lock)
+            if(can_execute):
+                
+                self.threading_lock.release()
+                result = query(args)
+    
+
+
+
             # If the query has failed the transaction should abort
             if result == False:
                 return self.abort()
         return self.commit()
 
-
-    #about should be called when there is a deadlock or if there is a crash.
     def abort(self):
         #TODO: do roll-back and any other necessary operations
-
         return False
 
-    # commit should be called when all the lock have been released and there are no more queries
-    # durring a commit all the write queries should be committed to disk
     def commit(self):
-         # TODO: commit to database
+        # TODO: commit to database
+
         return True
 
+    def lock_switch(self, check_lock, query_type):
+        match check_lock:
+            case "shared":
+                if(query_type.equals("read")):
+                    return True
+                return False
+            case "lock":
+                return False
+            case "unlock":
+                return True
