@@ -14,7 +14,7 @@ class Logger:
     # self.logger_dictionary[transaction_id] = {["function", old_rid, old_key, new_rid, new_key, commit_bool]}
     def log_write(self, new_record):
         self.current_transaction+=1
-        self.logger_dictionary[self.current_transaction] = {'operation': "write", 'rid': new_record.rid, 'key': record. , 'commited': False, 'aborted': False}
+        self.logger_dictionary[self.current_transaction] = {'operation': "write", 'rid': new_record.rid, 'key': new_record.key , 'commited': False, 'aborted': False}
         with open(self.path, 'wb') as file:
             pickle.dump(self.logger_dictionary, file)
 
