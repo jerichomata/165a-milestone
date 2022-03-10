@@ -1,4 +1,3 @@
-
 from lstore.bpool import bufferpool
 from lstore.table import Table
 import os

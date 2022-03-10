@@ -82,11 +82,13 @@ class bufferpool:
                 
         return -1 
 
-    def find_page(self, table_name, prefix, page_number):
+    def find_page(self, table_name, prefix, page_number, merged=False):
         cwd = os.getcwd()
         page_type = "B"
         if(not prefix):
             page_type = "T"
+        elif(merged):
+            page_type = "MB"
 
         exist_index = self.exist_in_bpool(page_type, page_number)
 
@@ -98,7 +100,7 @@ class bufferpool:
 
         with open(cwd + "\ECS165\\" + table_name + "\\" + page_type + str(page_number), 'rb') as file:
             lines = file.read()
-            page_find.set_num_records(struct.unpack('Q', lines[0:8])[0])
+            page_find.set_num_records(struct.unpack('Q', lines[:8])[0])
             page_find.set_data(lines[8:])
 
 

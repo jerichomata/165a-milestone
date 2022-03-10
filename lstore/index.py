@@ -72,6 +72,7 @@ class Index:
 
                 listOfValues = list(self.indices[i].keys())
                 listOfRids = list(self.indices[i].values())
+                #FIX THIS
                 del self.indices[i][listOfValues[listOfRids.index(base_rid)]]
 
                 if new_record.columns[i] in self.indices[i].keys():

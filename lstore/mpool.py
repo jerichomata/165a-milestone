@@ -8,18 +8,16 @@ class mergepool:
 
     #intialize a 3x5 bufferpool, this is an arbitrary size. 
     def __init__(self):
-        self.MAX_SIZE = 55
         #bufferpool that stores tuple ( page, time_accessed ).
-        self.bpool = []
+        self.mpool = []
         self.path = []
         #both lists because bufferpool is so small that inefficent searching algorithms don't matter.
-        self.pinned_pages = []
         self.dirty_pages = []
 
     #mark this page as dirty if it has been updated or recently created and not put to "disk".
     def mark_dirty(self, page):
-        if page in self.bpool and page not in self.dirty_pages:
-            # print("marking dirty", self.bpool[index][0].name)
+        if page in self.mpool and page not in self.dirty_pages:
+            # print("marking dirty", self.mpool[index][0].name)
             self.dirty_pages.append(page)
 
     #push all updates to "disk".
@@ -35,15 +33,6 @@ class mergepool:
             self.write_page_to_disk(page[0], path)
 
 
-    def make_clean2(self, page):
-        cwd = os.getcwd()
-        path = cwd + "\ECS165\\" + page.table_name
-        try:
-            os.mkdir(path)
-        except OSError as error:
-            pass
-        self.write_page_to_disk(page, path)
-
     def write_page_to_disk(self, page, path):
         with open(path + "\\" + page.name, 'wb') as file:
             num_records = bytearray(8)
@@ -52,7 +41,7 @@ class mergepool:
 
 
     def pin_page(self, page):
-        if page in self.bpool and page not in self.pinned_pages:
+        if page in self.mpool and page not in self.pinned_pages:
             self.pinned_pages.append(page)
 
     def unpin_page(self, page):
@@ -64,32 +53,31 @@ class mergepool:
 
     #add page to bufferpool because it has been read, updated, or created.
     def add_page(self, page):
-        if(self.MAX_SIZE > len(self.bpool)):
-            page_list = [page,time.time()]
-            self.bpool.append(page_list)
-            return page_list
-        else:
-            self.evict_page()
-            page_list = [page,time.time()]
-            self.bpool.append(page_list)
-            return page_list
+        self.mpool.append(page)
+        return page
         
-    def exist_in_bpool(self, page_type, page_number):
-        for i, page in enumerate(self.bpool):
+        
+    def exist_in_mpool(self, page_type, page_number):
+        for i, page in enumerate(self.mpool):
             #i is a pair containing (page, time)
-            if page[0].get_name() == page_type + str(page_number):
+            if page.get_name() == page_type + str(page_number):
                 return i
                 
         return -1 
 
-    def find_page(self, table_name, page_number):
+    def find_page(self, table_name, prefix, page_number):
         cwd = os.getcwd()
-        page_type = "MP"
-        exist_index = self.exist_in_bpool(page_type, page_number)
+
+        if prefix:
+            page_type = "B"
+        else:
+            page_type = "T"
+
+
+        exist_index = self.exist_in_mpool(page_type, page_number)
 
         if(exist_index > -1):
-            self.bpool[exist_index][1] = time.time()
-            return self.bpool[exist_index]
+            return self.mpool[exist_index]
 
         page_find = Page(page_type + str(page_number), table_name)
 
