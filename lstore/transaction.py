@@ -29,37 +29,46 @@ class Transaction:
     # t = Transaction()
     # t.add_query(q.update, grades_table, 0, *[None, 1, None, 2, None])
     """
-    def add_query(self, table, query, *args):
+    def add_query(self, query, table, *args):
         self.tables.append(table)
         self.queries.append((query, args))
         # use grades_table for aborting
 
     # If you choose to implement this differently this method must still return True if transaction commits or False on abort
     def run(self):
+        i = 0
         for query, args in self.queries:
             #Acquire the lock to check if the record is ok to continue
             self.threading_lock.acquire()
-            can_execute = self.lock_switch(args[0].check_lock(query.__name__))
-            if(can_execute):
+            #passes in base_rid & query type to check if it can run the operation
+            can_run = self.tables[i].check_lock(args[0], query.__name__)
+            if(can_run):
                 self.threading_lock.release()
-                if(can_execute == False):
+                if(can_run == False):
                     self.abort()
                 else:
                     #gets transaction_id from log & appends to transactions list
+                    #query will return bool False if fail, transaction_id if successful
                     result = query(args)
+
                     self.transaction_type.append(query.__name__)
                     self.transaction_ids.append(result)
+            else:
+                self.threading_lock.release()
+                return self.abort()
             # If the query has failed the transaction should abort
             if type(result) == bool:
                 return self.abort()
             else:
+                #increment table list. 
+                i = i+1
                 pass
         return self.commit()
 
     def abort(self):
         i = 0
         for table in self.tables:
-            table.undo(self.transaction_type, self.transaction_ids[i])
+            table.undo(self.transaction_ids[i])
         return False
 
     def commit(self):
@@ -71,14 +80,3 @@ class Transaction:
             os.remove(path)
             i = i+1
         return True
-
-    def lock_switch(self, check_lock, query_type):
-        match check_lock:
-            case "shared":
-                if(query_type.equals("read")):
-                    return True
-                return False
-            case "lock":
-                return False
-            case "unlock":
-                return True
