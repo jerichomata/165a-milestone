@@ -1,6 +1,4 @@
-from importlib.metadata import metadata
 from lstore.bpool import bufferpool
-from asyncio.windows_events import NULL
 from lstore.table import Table
 import os
 import pickle
@@ -75,4 +73,4 @@ class Database():
         for table in self.tables:
             if table.name == name:
                 return table
-        return NULL
+        return None

@@ -1,4 +1,3 @@
-from msilib import schema
 from lstore.index import Index
 from lstore.mpool import mergepool
 from lstore.page import Page
@@ -64,7 +63,7 @@ class Table:
 
         self.index = Index(self)
         self.bpool = bpool
-        self.mpool = None
+        self.mpool = {}
         self.tps_list = {}
         self.threading_lock = threading.Lock()
         pass
@@ -600,7 +599,7 @@ class Table:
         page_range = int((indirection_page_number+self.num_columns_hidden)/self.num_columns_hidden)
 
         print("merge started on", page_range)
-        self.mpool = mergepool()
+        self.mpool[page_range] = mergepool()
         base_pages = self.read_base_page_range(indirection_page_number)
 
         new_tps = 0
@@ -621,11 +620,10 @@ class Table:
         self.threading_lock.acquire()
         self.tps_list[page_range] = new_tps
         self.merge_in_progress[page_range] = False
+        self.mpool[page_range] = None
         self.threading_lock.release()
 
         print("merge on" ,page_range,"complete")
-
-        self.mpool = None
 
     def write_base_page_range(self, base_pages):
         for i, page in enumerate(base_pages):
