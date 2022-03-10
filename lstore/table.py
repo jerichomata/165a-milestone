@@ -175,6 +175,7 @@ class Table:
         base_schema_encoding_value = format(base_schema_encoding[0].read(base_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
         self.bpool.unpin_page(base_schema_encoding)
         
+
         page_range = (base_pages[INDIRECTION_COLUMN]+self.num_columns_hidden - 1)/self.num_columns_hidden
 
         if indirection_rid < self.tps_list[page_range]:
@@ -189,7 +190,6 @@ class Table:
 
             return return_query_columns
 
-        
         
         for column, i in enumerate(query_columns):
             if i == 1:
