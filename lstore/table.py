@@ -232,7 +232,7 @@ class Table:
                 self.merge_in_progress[page_range] = True
                 self.threading_lock.release()
                 self.bpool.make_clean()
-                thread = threading.Thread(target = self.merge, args=(base_pages[INDIRECTION_COLUMN], ))
+                thread = threading.Thread(target = self.merge, args=(base_pages[INDIRECTION_COLUMN], ), daemon=True)
                 thread.start()
             else:
                 self.threading_lock.release()
@@ -361,29 +361,6 @@ class Table:
             tail_indirection = self.mpool.find_page(self.name, False, tail_pages[INDIRECTION_COLUMN])
             next_indirection = tail_indirection.read(tail_offsets[INDIRECTION_COLUMN])
 
-
-
-    def mpool_get_value(self, base_rid, column):
-        location = self.page_directory[base_rid]
-
-        base_index = self.mpool.find_page( self.name, True, location[1] , INDIRECTION_COLUMN )
-        rid = self.mpool.bpool[base_index].read(location[2])
-
-        if rid == 1:
-            
-            base_index = self.mpool.find_page( self.name, True, location[1] , column)
-            return self.mpool.bpool[base_index].read(location[2])
-
-        new_location = self.page_directory[rid]
-        index = self.mpool.find_page( self.name, False, new_location[1], column)
-        return self.mpool.bpool[index].read(new_location[2])
-
-    def mpool_set_value(self, value, rid, column):
-        location = self.page_directory[rid]
-
-        index = self.mpool.find_page(self.name, location[0], location[1] , column)
-        self.mpool.bpool[index].set_value(value, location[2])
-        self.mpool.mark_dirty(index)
 
     def is_base(self, rid):
         return self.page_directory[rid][0]

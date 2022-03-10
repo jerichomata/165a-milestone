@@ -100,7 +100,7 @@ class bufferpool:
 
         with open(cwd + "\ECS165\\" + table_name + "\\" + page_type + str(page_number), 'rb') as file:
             lines = file.read()
-            page_find.set_num_records(struct.unpack('Q', lines[0:8])[0])
+            page_find.set_num_records(struct.unpack('Q', lines[:8])[0])
             page_find.set_data(lines[8:])
 
 
