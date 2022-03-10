@@ -82,11 +82,13 @@ class bufferpool:
                 
         return -1 
 
-    def find_page(self, table_name, prefix, page_number):
+    def find_page(self, table_name, prefix, page_number, merged=False):
         cwd = os.getcwd()
         page_type = "B"
         if(not prefix):
             page_type = "T"
+        elif(merged):
+            page_type = "MB"
 
         exist_index = self.exist_in_bpool(page_type, page_number)
 

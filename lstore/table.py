@@ -1,5 +1,6 @@
 from msilib import schema
 from lstore.index import Index
+from lstore.mpool import mergepool
 from lstore.page import Page
 from lstore.bpool import bufferpool
 from time import time
@@ -37,7 +38,7 @@ class Table:
     key: index of the table key
     num_columns_hidden: number of columns in table
     current_rid: number of records in table
-    page_directory: rid | base?(bool), page(int), offset(int)
+    page_directory: {rid | {base(bool), pages(dictionary of int), offsets(dictionary of ints)}}
     base_pages: list of base pages
     tail_pages: list of tail pages
     """
@@ -55,30 +56,27 @@ class Table:
         self.num_records = 0
 
         self.page_directory = {}
-
-        self.original_base_pages = []
         self.base_pages = 0
         self.tail_pages = 0
         self.newest_base_pages = {}
         self.newest_tail_pages = {}
+        self.merge_in_progress = {}
 
-        self.merged_base_page_ranges = 0
         self.index = Index(self)
         self.bpool = bpool
         self.mpool = None
-        self.tps_list = []
+        self.tps_list = {}
         self.threading_lock = threading.Lock()
         pass
 
     def __getstate__(self):
         return (self.name, self.primary_key_column, self.primary_key_column_hidden, 
-            self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, 
-            self.original_base_pages, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages, self.merged_base_page_ranges,
+            self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages,
             self.index, self.bpool, self.mpool, self.tps_list)
     
     def __setstate__(self, state):
 
-        self.name, self.primary_key_column, self.primary_key_column_hidden, self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.original_base_pages, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages, self.merged_base_page_ranges, self.index, self.bpool, self.mpool, self.tps_list = state
+        self.name, self.primary_key_column, self.primary_key_column_hidden, self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages, self.index, self.bpool, self.mpool, self.tps_list = state
 
         self.threading_lock = threading.Lock()
         self.threads = {}
@@ -158,16 +156,8 @@ class Table:
 
     def get_record(self, base_rid, query_columns):
         return_query_columns = query_columns
-<<<<<<< HEAD
         number_of_values_queried = query_columns.count(1)
         actual_number_of_values_queried = 0
-=======
-        number_of_values_queried = len(query_columns)
-        for i in range(len(query_columns)):
-            if query_columns[i] == 0:
-                number_of_values_queried -= 1
-                return_query_columns = None 
->>>>>>> parent of b54c7a5 (Revert "improved speed drastically ready for m3")
 
         base_location = self.page_directory[base_rid]
         
@@ -185,40 +175,70 @@ class Table:
         base_schema_encoding[1] = time()
         base_schema_encoding_value = format(base_schema_encoding[0].read(base_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
         self.bpool.unpin_page(base_schema_encoding)
-<<<<<<< HEAD
         
-=======
+        page_range = (base_pages[INDIRECTION_COLUMN]+self.num_columns_hidden - 1)/self.num_columns_hidden
 
->>>>>>> parent of b54c7a5 (Revert "improved speed drastically ready for m3")
-        for column, i in enumerate(query_columns):
-            if i != 0:
-                if indirection_rid == 1 or base_schema_encoding_value[column] == '0':
-                    base_column_page = self.bpool.find_page( self.name, True, base_pages[column+4])
+        if indirection_rid < self.tps_list[page_range]:
+            for column, i in enumerate(query_columns):
+                if i == 1:
+                    base_column_page = self.bpool.find_page(self.name, True, base_pages[column+4], True)
                     self.bpool.pin_page(base_column_page)
                     base_column_page[1] = time()
                     value = base_column_page[0].read(base_offsets[column+4])
                     self.bpool.unpin_page(base_column_page)
                     return_query_columns[column] = value
-<<<<<<< HEAD
+
+            return return_query_columns
+
+        
+        
+        for column, i in enumerate(query_columns):
+            if i == 1:
+                if indirection_rid == 1 or base_schema_encoding_value[column] == '0':
+                    base_column_page = self.bpool.find_page(self.name, True, base_pages[column+4])
+                    self.bpool.pin_page(base_column_page)
+                    base_column_page[1] = time()
+                    value = base_column_page[0].read(base_offsets[column+4])
+                    self.bpool.unpin_page(base_column_page)
+                    return_query_columns[column] = value
                     actual_number_of_values_queried += 1
         
         
         
         if actual_number_of_values_queried == number_of_values_queried:
-=======
-                    
-        correct_columns = 0
-        for i in range(len(query_columns)):
-            if query_columns[i] == 0 and return_query_columns[i] == None:
-                correct_columns += 1
-        
-        if len(query_columns)-correct_columns == number_of_values_queried:
->>>>>>> parent of b54c7a5 (Revert "improved speed drastically ready for m3")
             return return_query_columns
         
+        iterations = 0
         next_indirection = indirection_rid
         while(True):
 
+            self.threading_lock.acquire()
+            if next_indirection < self.tps_list[page_range]:
+                self.threading_lock.release()
+                for column, i in enumerate(query_columns):
+                    if i == 1 and return_query_columns[column] == None:
+                        base_column_page = self.bpool.find_page(self.name, True, base_pages[column+4], True)
+                        self.bpool.pin_page(base_column_page)
+                        base_column_page[1] = time()
+                        value = base_column_page[0].read(base_offsets[column+4])
+                        self.bpool.unpin_page(base_column_page)
+                        return_query_columns[column] = value
+
+                return return_query_columns
+            else:
+                self.threading_lock.release()
+            
+            self.threading_lock.acquire()
+            if iterations == 7 and self.merge_in_progress[int(page_range)] == False:
+                self.merge_in_progress[page_range] = True
+                self.threading_lock.release()
+                self.bpool.make_clean()
+                thread = threading.Thread(target = self.merge, args=(base_pages[INDIRECTION_COLUMN], ))
+                thread.start()
+            else:
+                self.threading_lock.release()
+
+            
             tail_location = self.page_directory[next_indirection]
             tail_pages = tail_location['pages']
             tail_offsets = tail_location['offsets']
@@ -231,7 +251,7 @@ class Table:
             self.bpool.unpin_page(tail_schema_encoding)
 
             for column, i in enumerate(query_columns):
-                if i != 0:
+                if i == 1:
                     if tail_schema_encoding_value[column] == '1':
                         tail_column_page = self.bpool.find_page( self.name, False, tail_pages[column+4])
                         self.bpool.pin_page(tail_column_page)
@@ -239,35 +259,20 @@ class Table:
                         value = tail_column_page[0].read(tail_offsets[column+4])
                         self.bpool.unpin_page(tail_column_page)
                         return_query_columns[column] = value
-<<<<<<< HEAD
                         actual_number_of_values_queried += 1
 
+            
             if actual_number_of_values_queried == number_of_values_queried:
                 return return_query_columns
-=======
-
-            correct_columns = 0
-            for i in range(len(query_columns)):
-                if query_columns[i] == 0 and return_query_columns[i] == None:
-                    correct_columns += 1
-            
-            if len(query_columns)-correct_columns == number_of_values_queried:
-                break
->>>>>>> parent of b54c7a5 (Revert "improved speed drastically ready for m3")
             
         
             tail_indirection = self.bpool.find_page(self.name, False, tail_pages[INDIRECTION_COLUMN])
             self.bpool.pin_page(tail_indirection)
             tail_indirection[1] = time()
             next_indirection = tail_indirection[0].read(tail_offsets[INDIRECTION_COLUMN])
-            
-            
             self.bpool.unpin_page(tail_indirection)
+            iterations += 1
 
-<<<<<<< HEAD
-=======
-        return return_query_columns
->>>>>>> parent of b54c7a5 (Revert "improved speed drastically ready for m3")
 
 
     def get_value(self, rid, column):
@@ -299,29 +304,86 @@ class Table:
         self.bpool.mark_dirty(page)
         self.bpool.unpin_page(page)
 
+    def mpool_get_record(self, base_rid, query_columns):
+        return_query_columns = query_columns
+        number_of_values_queried = query_columns.count(1)
+        actual_number_of_values_queried = 0
+
+        base_location = self.page_directory[base_rid]
+        
+        base_pages = base_location['pages']
+        base_offsets = base_location['offsets']
+
+        base_indirection = self.mpool.find_page(self.name, True, base_pages[INDIRECTION_COLUMN])
+        indirection_rid = base_indirection.read(base_offsets[INDIRECTION_COLUMN])
+
+        base_schema_encoding = self.mpool.find_page( self.name, True, base_pages[SCHEMA_ENCODING_COLUMN])
+        base_schema_encoding_value = format(base_schema_encoding.read(base_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
+        
+        for column, i in enumerate(query_columns):
+            if i == 1:
+                if indirection_rid == 1 or base_schema_encoding_value[column] == '0':
+                    base_column_page = self.mpool.find_page( self.name, True, base_pages[column+4])
+                    value = base_column_page.read(base_offsets[column+4])
+                    return_query_columns[column] = value
+                    actual_number_of_values_queried += 1
+        
+        
+        
+        if actual_number_of_values_queried == number_of_values_queried:
+            return return_query_columns, 1
+        
+        next_indirection = indirection_rid
+        latest_tail_record = 0
+        while(True):
+            if next_indirection > latest_tail_record:
+                latest_tail_record = next_indirection
+
+            tail_location = self.page_directory[next_indirection]
+            tail_pages = tail_location['pages']
+            tail_offsets = tail_location['offsets']
+
+
+            tail_schema_encoding = self.mpool.find_page( self.name, False, tail_pages[SCHEMA_ENCODING_COLUMN])
+            tail_schema_encoding_value = format(tail_schema_encoding.read(tail_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
+
+            for column, i in enumerate(query_columns):
+                if i == 1:
+                    if tail_schema_encoding_value[column] == '1':
+                        tail_column_page = self.mpool.find_page( self.name, False, tail_pages[column+4])
+                        value = tail_column_page.read(tail_offsets[column+4])
+                        return_query_columns[column] = value
+                        actual_number_of_values_queried += 1
+
+            if actual_number_of_values_queried == number_of_values_queried:
+                return return_query_columns, latest_tail_record
+            
+        
+            tail_indirection = self.mpool.find_page(self.name, False, tail_pages[INDIRECTION_COLUMN])
+            next_indirection = tail_indirection.read(tail_offsets[INDIRECTION_COLUMN])
+
+
 
     def mpool_get_value(self, base_rid, column):
         location = self.page_directory[base_rid]
 
         base_index = self.mpool.find_page( self.name, True, location[1] , INDIRECTION_COLUMN )
-        self.mpool.bpool[base_index][1] = time()
-        rid = self.mpool.bpool[base_index][0].read(location[2])
+        rid = self.mpool.bpool[base_index].read(location[2])
 
         if rid == 1:
             
             base_index = self.mpool.find_page( self.name, True, location[1] , column)
-            return self.mpool.bpool[base_index][0].read(location[2])
+            return self.mpool.bpool[base_index].read(location[2])
 
         new_location = self.page_directory[rid]
         index = self.mpool.find_page( self.name, False, new_location[1], column)
-        self.mpool.bpool[index][1] = time()
-        return self.mpool.bpool[index][0].read(new_location[2])
+        return self.mpool.bpool[index].read(new_location[2])
 
     def mpool_set_value(self, value, rid, column):
         location = self.page_directory[rid]
 
         index = self.mpool.find_page(self.name, location[0], location[1] , column)
-        self.mpool.bpool[index][0].set_value(value, location[2])
+        self.mpool.bpool[index].set_value(value, location[2])
         self.mpool.mark_dirty(index)
 
     def is_base(self, rid):
@@ -341,7 +403,8 @@ class Table:
                 index = self.bpool.add_page(Page("B" + str(self.base_pages),self.name))
                 self.bpool.mark_dirty(index)
                 self.newest_base_pages[i] = self.base_pages
-            self.tps_list.append(0)
+            self.tps_list[1] = 0
+            self.merge_in_progress[1] = False
 
         added_new_base_page_range = False
         pages = {}
@@ -381,20 +444,16 @@ class Table:
 
         # add to tps list for new base page range if a new base page range was created.
         if added_new_base_page_range:
-            self.tps_list.append(0)
+            self.tps_list[int(self.base_pages/self.num_columns_hidden)] = 0
+            self.merge_in_progress[int(self.base_pages/self.num_columns_hidden)] = False
         
-
-        # keep track of original base pages
-        for page in pages:
-            if page not in self.original_base_pages:
-                self.original_base_pages.append(page)
 
         self.page_directory[record.rid] = {'base':True, 'pages':pages, 'offsets':offsets}
         self.index.insert(record, record.rid)
 
 
     def update_record(self, record, base_rid):
-        
+    
         new_rid = record.rid
 
         #Get old base page indirection to set as indirection column on this entry
@@ -523,6 +582,7 @@ class Table:
         self.index.update(schema_encoding, record, base_rid)
 
 
+
     def delete_record(self, key):
         starting_rid = self.index.locate(key)[0]
         self.index.drop_record(starting_rid)
@@ -536,42 +596,34 @@ class Table:
 
     # store it into mergpool 
     # empty the mergepool 
-    def merge(self, page_range):
-        
-        self.threading_lock.acquire()
-        if page_range not in self.original_base_pages:
-            original = False
-        else:
-            original = True
-        
-        self.mpool = bufferpool()
-        tps = 0
-        base_rids = []
-        base_pages, new_page_range = self.read_base_page_range(page_range,original)
+    def merge(self, indirection_page_number):
+        page_range = int((indirection_page_number+self.num_columns_hidden)/self.num_columns_hidden)
 
+        print("merge started on", page_range)
+        self.mpool = mergepool()
+        base_pages = self.read_base_page_range(indirection_page_number)
+
+        new_tps = 0
         for i in range(base_pages[0].num_records):
-            rid = base_pages[0].read(i)
             base_rid = base_pages[1].read(i)
-            base_rids.append(base_rid)
+            base_pages[2].set_value(0, i)
 
-            if rid > tps:
-                tps = rid
+            new_record, latest_tail_record = self.mpool_get_record(base_rid, [1 for _ in range(self.num_columns)])
 
-
-            for j in range(2, self.num_columns_hidden):
-                base_pages[j].set_value(self.mpool_get_value(base_rid, j), i)
+            if latest_tail_record > new_tps:
+                new_tps = latest_tail_record
+            
+            for j in range(4, self.num_columns_hidden):
+                base_pages[j].set_value(new_record[j-4], i)
 
         self.write_base_page_range(base_pages)
-        for rid in base_rids:
-            self.page_directory[rid][1] = new_page_range
 
-        if original:
-            self.tps_list.append(tps)
-        else:
-            self.tps_list[page_range] = tps
-        self.merged_base_page_ranges += 1
-
+        self.threading_lock.acquire()
+        self.tps_list[page_range] = new_tps
+        self.merge_in_progress[page_range] = False
         self.threading_lock.release()
+
+        print("merge on" ,page_range,"complete")
 
         self.mpool = None
 
@@ -587,23 +639,17 @@ class Table:
 
 
     # reads all base pages from disk and stores it into a list of base pages
-    def read_base_page_range(self, page_range, original):
-        in_page_range = None
+    def read_base_page_range(self, indirection_page_number):
         cwd = os.getcwd()
         page_type = 'B'
         base_pages = []
         for i in range(self.num_columns_hidden):
-            with open(cwd + "\ECS165\\" + self.name + "\\" + page_type + str(page_range) + "-" + str(i), 'rb') as file:
+            with open(cwd + "\ECS165\\" + self.name + "\\" + page_type + str(indirection_page_number+i), 'rb') as file:
                 lines = file.read()
 
-                if original:
-                    in_page_range = len(self.tps_list)
-                else:
-                    in_page_range = page_range
-
-                page_find = Page(page_type + str(in_page_range) + "-" + str(i), self.name)
+                page_find = Page("MB" + str(indirection_page_number+i), self.name)
                 page_find.set_num_records(struct.unpack('Q', lines[0:8])[0])
                 page_find.set_data(lines[8:])
                 base_pages.append(page_find)
             
-        return base_pages, in_page_range
+        return base_pages
