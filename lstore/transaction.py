@@ -42,12 +42,12 @@ class Transaction:
             #Acquire the lock to check if the record is ok to continue
             self.threading_lock.acquire()
             #passes in base_rid & query type to check if it can run the operation
-            can_run = self.tables[i].check_lock(args[0], query.__name__)
+            can_run = self.tables[i].lock_manager.check_lock(args[0], query.__name__)
             if(can_run):
                 if query.__name__ == "update" or query.__name__ == "insert":
-                    self.tables[i].set_lock(args[0])
+                    self.tables[i].lock_manager.set_lock(args[0])
                 elif query.__name__ == "select":
-                    self.tables[i].set_shared(args[0])
+                    self.tables[i].lock_manager.set_shared(args[0])
                 self.threading_lock.release()
                 #gets transaction_id from log & appends to transactions list
                 #query will return bool False if fail, transaction_id if successful
@@ -69,11 +69,11 @@ class Transaction:
 
     def undo(self, transaction_id, table):
         with open("./log/" + table.name + "/"  + transaction_id, 'rb') as file:
-            transaction = pickle.load(file)
-        if transaction['operation'] == "update":
-            table.undo_update(transaction['new_record'], transaction['old_rid'], transaction['old_indirection'], transaction['old_schema'])
-        if transaction['operation'] == "insert":
-            table.undo_insert(transaction['rid'])
+            query = pickle.load(file)
+        if query['operation'] == "update":
+            table.undo_update(query['new_record'], query['old_rid'], query['old_indirection'], query['old_schema'])
+        if query['operation'] == "insert":
+            table.undo_insert(query['rid'])
 
     def abort(self):
         i = 0
