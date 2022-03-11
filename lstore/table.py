@@ -99,25 +99,6 @@ class Table:
         self.num_records += 1
         return self.current_rid
 
-    def check_lock(self, key, operation):
-        self.lock_manager.check_lock(key, operation)
-
-    def make_shared(self):
-        self.lock_manager.set_shared()
-
-    def set_lock(self):
-        self.lock_manager.set_lock()
-
-    def release_lock(self):
-        self.lock_manager.release_lock()
-
-    def undo(self, transaction_id):
-        with open("./log/" + self.table.name + "/"  + transaction_id, 'rb') as file:
-            transaction = pickle.load(file)
-        if transaction['operation'] == "update":
-            self.undo_update(transaction)
-        if transaction['operation'] == "insert":
-            self.undo_insert(transaction)
 
 
     def get_newest_value(self, base_rid, column):
