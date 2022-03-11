@@ -173,7 +173,7 @@ class Table:
         
 
         page_range = int((base_pages[INDIRECTION_COLUMN]+self.num_columns_hidden - 1)/self.num_columns_hidden)
-
+        print(self.tps_list)
         if indirection_rid < self.tps_list[page_range]:
             for column, i in enumerate(query_columns):
                 if i == 1:
@@ -364,7 +364,10 @@ class Table:
         return self.page_directory[rid][0]
 
     def add_record(self, record):
-        id = self.logger.log_insert(record, threading.Lock())
+        lock = threading.Lock()
+        lock.acquire()
+        id = self.logger.log_insert(record)
+        lock.release()
         record.columns.insert(INDIRECTION_COLUMN, 1)
         record.columns.insert(RID_COLUMN, record.rid)
         record.columns.insert(TIMESTAMP_COLUMN, time())
@@ -419,7 +422,7 @@ class Table:
         # add to tps list for new base page range if a new base page range was created.
 
         if added_new_base_page_range:
-            # self.tps_list[int(self.base_pages/self.num_columns_hidden)] = 0
+            self.tps_list[int(self.base_pages/self.num_columns_hidden)] = 0
             self.merge_in_progress[int(self.base_pages/self.num_columns_hidden)] = False
         
 
@@ -448,7 +451,10 @@ class Table:
         schema_encoding = ""
         schema_encoding_base = format(self.get_value(base_rid, SCHEMA_ENCODING_COLUMN), "064b")
 
-        id = self.logger.log_update(record, base_rid, old_base_indirection, schema_encoding_base, threading.Lock())
+        lock = threading.Lock()
+        lock.acquire()
+        id = self.logger.log_update(record, base_rid, old_base_indirection, schema_encoding_base)
+        lock.release()
 
         for i in range(self.num_columns):
             if(record.columns[i+3] == None):

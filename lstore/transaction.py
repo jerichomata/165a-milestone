@@ -32,10 +32,10 @@ class Transaction:
         for query in self.queries:
             lock.acquire()
             passes_lock = query['table'].lock_manager.check_lock(query['key'], query['name'])
+            get_lock = query['table'].lock_manager.get_lock(query['key'])
             # print(passes_lock)
             if(passes_lock):
                 if query['name'] == "update" or query['name'] == "insert":
-
                     query['table'].lock_manager.set_lock(query['key'])
 
                 elif query['name'] == "select":
@@ -49,19 +49,14 @@ class Transaction:
                 lock.acquire()
                 if(query['name'] == "select"):
                     query['table'].lock_manager.count[query['key']]-=1
-                query['table'].lock_manager.release_lock(query['key'])
                 lock.release()
-
-                query['type'] = query['function'].__name__
                 
-
-                if(type(query['id']) == bool):
-                    self.abort()
-                    return
             else:
                 lock.release()
+                print("aborted", query['key'], query['name'], get_lock)
                 self.abort()
                 return False
+
         self.commit()
         return True
 
@@ -74,21 +69,18 @@ class Transaction:
             table.undo_insert(query_log['rid'])
 
     def abort(self):
-        print("abort")
-        print([x['id'] for x in self.queries])
-
+        print([x['id'] for x in self.queries if(x['id'] != None)])
         for query in self.queries:
             if(query['id'] != None):
                 self.undo(query['id'], query['table'])
 
     def commit(self):
-        print("commit")
-        print([x['id'] for x in self.queries])
         cwd = os.getcwd()
         for query in self.queries:
+            query['table'].lock_manager.release_lock(query['key'])
             path = cwd + "\log\\" + query['table'].name + "\\"  + str(query['id'])
-            try:
-                os.remove(path)
-            except:
-                pass
+            # try:
+            #     os.remove(path)
+            # except:
+            #     pass
         
