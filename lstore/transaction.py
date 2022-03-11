@@ -71,9 +71,9 @@ class Transaction:
         with open("./log/" + table.name + "/"  + transaction_id, 'rb') as file:
             transaction = pickle.load(file)
         if transaction['operation'] == "update":
-            table.undo_update(new_record, old_rid, old_indirection, old_schema)
+            table.undo_update(transaction['new_record'], transaction['old_rid'], transaction['old_indirection'], transaction['old_schema'])
         if transaction['operation'] == "insert":
-            table.undo_insert(transaction)
+            table.undo_insert(transaction['rid'])
 
     def abort(self):
         i = 0

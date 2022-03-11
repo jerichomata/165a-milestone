@@ -3,6 +3,9 @@ from lstore.index import Index
 from lstore.mpool import mergepool
 from lstore.page import Page
 from lstore.bpool import bufferpool
+
+from lstore.lock_manager import LockManager
+from lstore.logger import Logger
 from time import time
 
 import os
@@ -45,6 +48,9 @@ class Table:
     def __init__(self, name="table", num_columns=1, key=0, bpool=bufferpool()):
         self.name = name
         self.threads = {}
+
+        self.lock_manager = LockManager()
+        self.logger = Logger()
 
         self.primary_key_column = key
         self.primary_key_column_hidden = key + 4
@@ -92,6 +98,26 @@ class Table:
         self.current_rid += 1
         self.num_records += 1
         return self.current_rid
+
+    def check_lock(self, key, operation):
+        self.lock_manager.check_lock(key, operation)
+
+    def make_shared(self):
+        self.lock_manager.set_shared()
+
+    def set_lock(self):
+        self.lock_manager.set_lock()
+
+    def release_lock(self):
+        self.lock_manager.release_lock()
+
+    def undo(self, transaction_id):
+        with open("./log/" + self.table.name + "/"  + transaction_id, 'rb') as file:
+            transaction = pickle.load(file)
+        if transaction['operation'] == "update":
+            self.undo_update(transaction)
+        if transaction['operation'] == "insert":
+            self.undo_insert(transaction)
 
 
     def get_newest_value(self, base_rid, column):
@@ -273,8 +299,6 @@ class Table:
             self.bpool.unpin_page(tail_indirection)
             iterations += 1
 
-
-
     def get_value(self, rid, column):
         location = self.page_directory[rid]
         pages = location['pages']
@@ -370,7 +394,7 @@ class Table:
         return self.page_directory[rid][0]
 
     def add_record(self, record):
-        
+        id = self.logger(record, self.threading_lock)
         record.columns.insert(INDIRECTION_COLUMN, 1)
         record.columns.insert(RID_COLUMN, record.rid)
         record.columns.insert(TIMESTAMP_COLUMN, time())
@@ -430,10 +454,11 @@ class Table:
 
         self.page_directory[record.rid] = {'base':True, 'pages':pages, 'offsets':offsets}
         self.index.insert(record, record.rid)
+        return id
 
 
     def update_record(self, record, base_rid):
-    
+        id = self.logger.log_update(record, self.get_newest_value(base_rid, RID_COLUMN), self.get_newest_value(base_rid, INDIRECTION_COLUMN), self.get_newest_value(base_rid, SCHEMA_ENCODING_COLUMN))
         new_rid = record.rid
 
         #Get old base page indirection to set as indirection column on this entry
@@ -560,8 +585,7 @@ class Table:
 
         self.page_directory[new_rid] = {'base':False, 'pages':pages, 'offsets':offsets}
         self.index.update(schema_encoding, record, base_rid)
-
-
+        return id
 
     def delete_record(self, key):
         starting_rid = self.index.locate(key)[0]
@@ -640,8 +664,6 @@ class Table:
             except OSError as error:
                 pass
             self.mpool.write_page_to_disk(page, path)
-
-
     # reads all base pages from disk and stores it into a list of base pages
     def read_base_page_range(self, indirection_page_number):
         cwd = os.getcwd()

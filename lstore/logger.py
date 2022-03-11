@@ -17,7 +17,9 @@ class Logger:
         self.logger_transaction = {'id': self.current_transaction, 'operation': "write", 'rid': new_record.rid, 'key': new_record.key , 'commited': False, 'aborted': False, 'table': self.table_name}
         with open(self.path + str(self.current_transaction), 'wb') as file:
             pickle.dump(self.logger_transaction, file)
+        return_id = self.current_transaction
         lock.release()
+        return return_id
 
     def log_update(self, new_record, old_rid, old_indirection, old_schema, lock):
         lock.acquire()
@@ -26,7 +28,9 @@ class Logger:
             'indirection': old_indirection, 'schema': old_schema, 'rid': new_record.rid, 'commited': False, 'aborted': False, 'table': self.table_name}
         with open(self.path + str(self.current_transaction), 'wb') as file:
             pickle.dump(self.logger_transaction, file)
+        return_id = self.current_transaction
         lock.release()
+        return return_id
 
     def log_delete(self, record, lock):
         lock.acquire()

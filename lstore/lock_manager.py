@@ -1,8 +1,6 @@
 import pickle
 import os
 
-lock_table = {}
-
 class LockManager:
 
     def __init__(self, table):
@@ -31,12 +29,3 @@ class LockManager:
 
     def release_lock(self, key):
         self.lock_table[key] = "unlocked"
-
-    def undo(self, transaction_id):
-        with open("./log/" + self.table.name + "/"  + transaction_id, 'rb') as file:
-            transaction = pickle.load(file)
-        if transaction['operation'] == "update":
-            self.undo_update(transaction)
-        if transaction['operation'] == "insert":
-            self.undo_insert(transaction)
-

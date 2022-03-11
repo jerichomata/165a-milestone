@@ -40,8 +40,7 @@ class Query:
         columns =  list(columns)
         new_record = Record(self.table.get_new_rid(), columns[self.table.primary_key_column], columns)
         self.keys.append(columns[self.table.primary_key_column])
-        self.table.add_record(new_record)
-        return True
+        return self.table.add_record(new_record)
 
     """
     # Read a record with specified key
@@ -78,9 +77,7 @@ class Query:
             
             rid = self.table.get_new_rid()
             new_record = Record(rid, primary_key, list(columns))
-            self.table.update_record(new_record, base_rid)
-
-            return True
+            return self.table.update_record(new_record, base_rid)
         return False
             
 
