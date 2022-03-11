@@ -3,6 +3,7 @@ from lstore.page import Page
 import struct
 import time
 import os
+import threading
 
 class bufferpool:
 
@@ -64,14 +65,18 @@ class bufferpool:
 
     #add page to bufferpool because it has been read, updated, or created.
     def add_page(self, page):
+        lock = threading.Lock()
+        lock.acquire()
         if(self.MAX_SIZE > len(self.bpool)):
             page_list = [page,time.time()]
             self.bpool.append(page_list)
+            lock.release()
             return page_list
         else:
             self.evict_page()
             page_list = [page,time.time()]
             self.bpool.append(page_list)
+            lock.release()
             return page_list
         
     def exist_in_bpool(self, page_type, page_number):
@@ -89,13 +94,19 @@ class bufferpool:
             page_type = "T"
         elif(merged):
             page_type = "MB"
-
+        lock = threading.Lock()
+        lock.acquire()
         exist_index = self.exist_in_bpool(page_type, page_number)
+
 
         if(exist_index > -1):
             self.bpool[exist_index][1] = time.time()
-            return self.bpool[exist_index]
-
+            page = self.bpool[exist_index]
+            lock.release()
+            return page
+        else:
+            lock.release()
+            
         page_find = Page(page_type + str(page_number), table_name)
 
         with open(cwd + "\ECS165\\" + table_name + "\\" + page_type + str(page_number), 'rb') as file:
@@ -121,8 +132,14 @@ class bufferpool:
         #find first page in pages that that is not pinned.
         for pair in temp:
             if(pair not in self.pinned_pages):
+                lock = threading.Lock()
+                lock.acquire()
                 self.make_clean2(pair[0])
-                self.bpool.remove(pair)
+                lock.release()
+                try:
+                    self.bpool.remove(pair)
+                except:
+                    pass
                 return # print("page evicted ", pair[0].name)
 
         

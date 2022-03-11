@@ -6,7 +6,8 @@ from lstore.transaction_worker import TransactionWorker
 from random import choice, randint, sample, seed
 
 db = Database()
-db.open()
+db.open('./ECS165')
+
 # Getting the existing Grades table
 grades_table = db.get_table('Grades')
 
@@ -19,7 +20,7 @@ records = {}
 number_of_records = 1000
 number_of_transactions = 100
 number_of_operations_per_record = 10
-num_threads = 8
+num_threads = 2
 
 keys = []
 records = {}
@@ -29,7 +30,8 @@ seed(3562901)
 for i in range(0, number_of_records):
     key = 92106429 + i
     keys.append(key)
-    records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
+    records[key] = [key, randint(i * 20, (i + 1) * 20), randint(i * 20, (i + 1) * 20), randint(i * 20, (i + 1) * 20), randint(i * 20, (i + 1) * 20)]
+    print(records[key])
 
 transaction_workers = []
 transactions = []
@@ -42,11 +44,6 @@ for i in range(num_threads):
 
 
 
-for i in range(0, number_of_records):
-    key = 92106429 + i
-    keys.append(key)
-    records[key] = [key, randint(i * 20, (i + 1) * 20), randint(i * 20, (i + 1) * 20), randint(i * 20, (i + 1) * 20), randint(i * 20, (i + 1) * 20)]
-    q = Query(grades_table)
 
 
 # x update on every column
@@ -61,8 +58,8 @@ for j in range(number_of_operations_per_record):
             original = records[key].copy()
             # update our test directory
             records[key][i] = value
-            transactions[j % number_of_transactions].add_query(query.select, grades_table, key, 0, [1, 1, 1, 1, 1])
-            transactions[j % number_of_transactions].add_query(query.update, grades_table, key, *updated_columns)
+            transactions[key % number_of_transactions].add_query(query.select, grades_table, key, 0, [1, 1, 1, 1, 1])
+            transactions[key % number_of_transactions].add_query(query.update, grades_table, key, *updated_columns)
 print("Update finished")
 
 
