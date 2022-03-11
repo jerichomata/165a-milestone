@@ -1,3 +1,4 @@
+from msilib import schema
 from lstore.index import Index
 from lstore.mpool import mergepool
 from lstore.page import Page
@@ -78,7 +79,6 @@ class Table:
         self.name, self.primary_key_column, self.primary_key_column_hidden, self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages, self.index, self.bpool, self.mpool, self.tps_list = state
 
         self.threading_lock = threading.Lock()
-        self.threads = {}
 
     def get_base_rid(self, rid):
         current_rid = rid
@@ -112,6 +112,7 @@ class Table:
         base_schema_encoding[1] = time()
         base_schema_encoding_value = format(base_schema_encoding[0].read(base_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
         self.bpool.unpin_page(base_schema_encoding)
+
 
         if indirection_rid == 1 or base_schema_encoding_value[column-4] == '0':
             base_column_page = self.bpool.find_page( self.name, True, base_pages[column])
@@ -154,7 +155,7 @@ class Table:
         return None
 
     def get_record(self, base_rid, query_columns):
-        return_query_columns = query_columns
+        return_query_columns = [None for _ in query_columns]
         number_of_values_queried = query_columns.count(1)
         actual_number_of_values_queried = 0
 
@@ -303,9 +304,8 @@ class Table:
         self.bpool.mark_dirty(page)
         self.bpool.unpin_page(page)
 
-    def mpool_get_record(self, base_rid, query_columns):
-        return_query_columns = query_columns
-        number_of_values_queried = query_columns.count(1)
+    def mpool_get_record(self, base_rid):
+        return_query_columns = [None for _ in range(self.num_columns)]
         actual_number_of_values_queried = 0
 
         base_location = self.page_directory[base_rid]
@@ -318,18 +318,18 @@ class Table:
 
         base_schema_encoding = self.mpool.find_page( self.name, True, base_pages[SCHEMA_ENCODING_COLUMN])
         base_schema_encoding_value = format(base_schema_encoding.read(base_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
+
         
-        for column, i in enumerate(query_columns):
-            if i == 1:
-                if indirection_rid == 1 or base_schema_encoding_value[column] == '0':
-                    base_column_page = self.mpool.find_page( self.name, True, base_pages[column+4])
-                    value = base_column_page.read(base_offsets[column+4])
-                    return_query_columns[column] = value
-                    actual_number_of_values_queried += 1
+        for column in range(self.num_columns):
+            if indirection_rid == 1 or base_schema_encoding_value[column] == '0':
+                base_column_page = self.mpool.find_page( self.name, True, base_pages[column+4])
+                value = base_column_page.read(base_offsets[column+4])
+                return_query_columns[column] = value
+                actual_number_of_values_queried += 1
         
         
         
-        if actual_number_of_values_queried == number_of_values_queried:
+        if actual_number_of_values_queried == self.num_columns:
             return return_query_columns, 1
         
         next_indirection = indirection_rid
@@ -346,20 +346,24 @@ class Table:
             tail_schema_encoding = self.mpool.find_page( self.name, False, tail_pages[SCHEMA_ENCODING_COLUMN])
             tail_schema_encoding_value = format(tail_schema_encoding.read(tail_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
 
-            for column, i in enumerate(query_columns):
-                if i == 1:
-                    if tail_schema_encoding_value[column] == '1':
-                        tail_column_page = self.mpool.find_page( self.name, False, tail_pages[column+4])
-                        value = tail_column_page.read(tail_offsets[column+4])
-                        return_query_columns[column] = value
-                        actual_number_of_values_queried += 1
+            for column in range(self.num_columns):
+                if tail_offsets[column+4] is not None:
+                    tail_column_page = self.mpool.find_page( self.name, False, tail_pages[column+4])
+                    value = tail_column_page.read(tail_offsets[column+4])
+                    return_query_columns[column] = value
+                    actual_number_of_values_queried += 1
 
-            if actual_number_of_values_queried == number_of_values_queried:
-                return return_query_columns, latest_tail_record
+            if actual_number_of_values_queried == self.num_columns:
+                break
             
         
             tail_indirection = self.mpool.find_page(self.name, False, tail_pages[INDIRECTION_COLUMN])
             next_indirection = tail_indirection.read(tail_offsets[INDIRECTION_COLUMN])
+            if next_indirection == 0:
+                print(base_rid)
+                break
+
+        return return_query_columns, latest_tail_record
 
 
     def is_base(self, rid):
@@ -570,6 +574,35 @@ class Table:
 
         self.set_value(0, starting_rid, RID_COLUMN)
 
+    def undo_add(self, new_rid):
+        try:
+            del self.page_directory[new_rid]
+            self.index.drop_record(new_rid)
+        except:
+            pass
+
+    def undo_update(self, new_rid, old_rid, old_indirection, old_schema):
+        try:
+            del self.page_directory[new_rid]
+        except:
+            pass
+
+        location = self.page_directory[old_rid]
+        pages = location["pages"]
+        offsets = location["offsets"]
+
+        indirection_page = self.bpool.find_page(self.name, True, pages[INDIRECTION_COLUMN])
+        self.bpool.pin_page(indirection_page)
+        indirection_page.set_value(old_indirection, offsets[INDIRECTION_COLUMN])
+        self.bpool.mark_dirty(indirection_page)
+        self.bpool.unpin_page(indirection_page)
+
+        schema_encoding_page = self.bpool.find_page(self.name, True, pages[SCHEMA_ENCODING_COLUMN])
+        self.bpool.pin_page(schema_encoding_page)
+        schema_encoding_page.set_value(old_schema, offsets[SCHEMA_ENCODING_COLUMN])
+        self.bpool.mark_dirty(schema_encoding_page)
+        self.bpool.unpin_page(schema_encoding_page)
+
     # store it into mergpool 
     # empty the mergepool 
     def merge(self, indirection_page_number):
@@ -582,7 +615,7 @@ class Table:
             base_rid = base_pages[1].read(i)
             base_pages[2].set_value(0, i)
 
-            new_record, latest_tail_record = self.mpool_get_record(base_rid, [1 for _ in range(self.num_columns)])
+            new_record, latest_tail_record = self.mpool_get_record(base_rid)
 
             if latest_tail_record > new_tps:
                 new_tps = latest_tail_record

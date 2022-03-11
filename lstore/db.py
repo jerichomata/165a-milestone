@@ -10,7 +10,7 @@ class Database():
         pass
 
     # Not required for milestone1
-    def open(self, path): 
+    def open(self, path="./ECS165"): 
         #db needs a bufferpool now
         self.bpool = bufferpool()
         #if database is new and there are previous files 
@@ -28,7 +28,6 @@ class Database():
                 newpath = os.path.join(path, filename)
                 for file in os.listdir(newpath):
                     if file == "metadata":
-                        print("good")
                         final = newpath+"\\metadata"
                         with open(final, 'rb') as target:
                             self.tables.append(pickle.load(target))
