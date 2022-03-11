@@ -76,18 +76,13 @@ class Transaction:
             table.undo_insert(query['rid'])
 
     def abort(self):
-        i = 0
-        for table in self.tables:
+        for i, table in enumerate(self.tables):
             table.undo(self.transaction_ids[i])
-            i
-        return False
 
     def commit(self):
 
         cwd = os.getcwd()
-        i = 0
-        for j in self.tables:
-            path = cwd + +"\\" + j + "\log\\" + self.transaction_ids[i]
+        for i, table in enumerate(self.tables):
+            path = cwd + +"\\" + table.name + "\log\\" + self.transaction_ids[i]
             os.remove(path)
             i = i+1
-        return True
