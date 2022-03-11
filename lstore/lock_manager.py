@@ -6,9 +6,10 @@ class LockManager:
     def __init__(self, table):
         self.table = table
         self.lock_table = {}
+        self.count = {}
 
     def check_lock(self, key, query_type):
-        if key not in self.lock_table.keys():
+        if key not in self.lock_table.keys(): 
             self.lock_table[key] = "unlocked"
 
         result = self.lock_table[key] 
@@ -31,4 +32,9 @@ class LockManager:
         self.lock_table[key] = "locked"
 
     def release_lock(self, key):
-        self.lock_table[key] = "unlocked"
+        if(self.lock_table[key] == "locked"):
+            self.lock_table[key] = "unlocked"
+        elif(self.lock_table[key] == "shared" and self.count[key] == 0):
+            self.lock_table[key] = "unlocked"
+        else:
+            pass

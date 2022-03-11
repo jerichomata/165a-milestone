@@ -39,14 +39,16 @@ class Transaction:
                     query['table'].lock_manager.set_lock(query['key'])
 
                 elif query['name'] == "select":
-                    
                     query['table'].lock_manager.set_shared(query['key'])
+                    query['table'].lock_manager.count[query['key']]+=1
 
                 lock.release()
 
                 query['id'] = query['function'](*query['args'])
 
                 lock.acquire()
+                if(query['name'] == "select"):
+                    query['table'].lock_manager.count[query['key']]-=1
                 query['table'].lock_manager.release_lock(query['key'])
                 lock.release()
 
@@ -72,21 +74,21 @@ class Transaction:
             table.undo_insert(query_log['rid'])
 
     def abort(self):
-        print("abt")
-        # print([x['id'] for x in self.queries])
+        print("abort")
+        print([x['id'] for x in self.queries])
 
         for query in self.queries:
             if(query['id'] != None):
                 self.undo(query['id'], query['table'])
 
     def commit(self):
-        print("cmt")
-        # print([x['id'] for x in self.queries])
+        print("commit")
+        print([x['id'] for x in self.queries])
         cwd = os.getcwd()
         for query in self.queries:
             path = cwd + "\log\\" + query['table'].name + "\\"  + str(query['id'])
-            # try:
-            #     os.remove(path)
-            # except:
-            #     pass
+            try:
+                os.remove(path)
+            except:
+                pass
         
