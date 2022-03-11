@@ -49,8 +49,8 @@ class Table:
         self.name = name
         self.threads = {}
 
-        self.lock_manager = LockManager()
-        self.logger = Logger()
+        self.lock_manager = LockManager(self)
+        self.logger = Logger(self.name)
 
         self.primary_key_column = key
         self.primary_key_column_hidden = key + 4
@@ -72,19 +72,7 @@ class Table:
         self.bpool = bpool
         self.mpool = mergepool()
         self.tps_list = {}
-        self.threading_lock = threading.Lock()
         pass
-
-    def __getstate__(self):
-        return (self.name, self.primary_key_column, self.primary_key_column_hidden, 
-            self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages,
-            self.index, self.bpool, self.mpool, self.tps_list)
-    
-    def __setstate__(self, state):
-
-        self.name, self.primary_key_column, self.primary_key_column_hidden, self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages, self.index, self.bpool, self.mpool, self.tps_list = state
-
-        self.threading_lock = threading.Lock()
 
     def get_base_rid(self, rid):
         current_rid = rid
@@ -219,9 +207,9 @@ class Table:
         next_indirection = indirection_rid
         while(True):
 
-            self.threading_lock.acquire()
+            threading.Lock().acquire()
             if next_indirection < self.tps_list[page_range]:
-                self.threading_lock.release()
+                threading.Lock().release()
                 for column, i in enumerate(query_columns):
                     if i == 1 and return_query_columns[column] == None:
                         base_column_page = self.bpool.find_page(self.name, True, base_pages[column+4], True)
@@ -233,17 +221,17 @@ class Table:
 
                 return return_query_columns
             else:
-                self.threading_lock.release()
+                threading.Lock().release()
             
-            self.threading_lock.acquire()
+            threading.Lock().acquire()
             if iterations == 2 and self.merge_in_progress[int(page_range)] == False:
                 self.merge_in_progress[page_range] = True
-                self.threading_lock.release()
+                threading.Lock().release()
                 self.bpool.make_clean()
                 thread = threading.Thread(target = self.merge, args=(base_pages[INDIRECTION_COLUMN], ), daemon=True)
                 thread.start()
             else:
-                self.threading_lock.release()
+                threading.Lock().release()
 
             
             tail_location = self.page_directory[next_indirection]
@@ -375,7 +363,7 @@ class Table:
         return self.page_directory[rid][0]
 
     def add_record(self, record):
-        id = self.logger(record, self.threading_lock)
+        id = self.logger.log_insert(record, threading.Lock())
         record.columns.insert(INDIRECTION_COLUMN, 1)
         record.columns.insert(RID_COLUMN, record.rid)
         record.columns.insert(TIMESTAMP_COLUMN, time())
@@ -439,7 +427,7 @@ class Table:
 
 
     def update_record(self, record, base_rid):
-        id = self.logger.log_update(record, self.get_newest_value(base_rid, RID_COLUMN), self.get_newest_value(base_rid, INDIRECTION_COLUMN), self.get_newest_value(base_rid, SCHEMA_ENCODING_COLUMN))
+        
         new_rid = record.rid
 
         #Get old base page indirection to set as indirection column on this entry
@@ -457,6 +445,8 @@ class Table:
 
         schema_encoding = ""
         schema_encoding_base = format(self.get_value(base_rid, SCHEMA_ENCODING_COLUMN), "064b")
+
+        id = self.logger.log_update(record, base_rid, old_base_indirection, schema_encoding_base)
 
         for i in range(self.num_columns):
             if(record.columns[i+3] == None):
@@ -630,11 +620,11 @@ class Table:
 
         self.write_base_page_range(base_pages)
 
-        self.threading_lock.acquire()
+        threading.Lock().acquire()
         self.tps_list[page_range] = new_tps
         self.merge_in_progress[page_range] = False
         self.mpool.mpool = []
-        self.threading_lock.release()
+        threading.Lock().release()
 
     def write_base_page_range(self, base_pages):
         for i, page in enumerate(base_pages):

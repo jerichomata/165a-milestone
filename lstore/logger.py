@@ -4,14 +4,16 @@ import threading
 class Logger:
 
     def __init__(self, table_name):
-        cwd = os.getcwd()
         self.table_name = table_name
-        self.path = "./log/" + table_name + "/"
+        self.path = str("./log/" + table_name + "/")
         self.current_query = 0
         self.logger_query = {}
+        print(self.path)
+        os.makedirs(self.path, exist_ok=True)
 
     # self.logger_dictionary[query_id] = {["function", old_rid, old_key, new_rid, new_key, commit_bool]}
     def log_insert(self, new_record, lock):
+        print("logging insert")
         lock.acquire()
         self.current_query+=1
         self.logger_query = {'id': self.current_query, 'operation': "write", 'rid': new_record.rid, 'key': new_record.key , 'commited': False, 'aborted': False, 'table': self.table_name}

@@ -37,23 +37,22 @@ class Transaction:
 
     # If you choose to implement this differently this method must still return True if transaction commits or False on abort
     def run(self):
-        i = 0
-        for query, args in self.queries:
+        for i, query in enumerate(self.queries):
             #Acquire the lock to check if the record is ok to continue
             self.threading_lock.acquire()
             #passes in base_rid & query type to check if it can run the operation
-            can_run = self.tables[i].lock_manager.check_lock(args[0], query.__name__)
+            can_run = self.tables[i].lock_manager.check_lock(query[1][0], query[0].__name__)
             if(can_run):
-                if query.__name__ == "update" or query.__name__ == "insert":
-                    self.tables[i].lock_manager.set_lock(args[0])
-                elif query.__name__ == "select":
-                    self.tables[i].lock_manager.set_shared(args[0])
+                if query[0].__name__ == "update" or query[0].__name__ == "insert":
+                    self.tables[i].lock_manager.set_lock(query[1][0])
+                elif query[0].__name__ == "select":
+                    self.tables[i].lock_manager.set_shared(query[1][0])
                 self.threading_lock.release()
                 #gets transaction_id from log & appends to transactions list
                 #query will return bool False if fail, transaction_id if successful
-                result = query(args)
+                result = query[0](*query[1])
 
-                self.transaction_type.append(query.__name__)
+                self.transaction_type.append(query[0].__name__)
                 self.transaction_ids.append(result)
             else:
                 self.threading_lock.release()
@@ -61,33 +60,30 @@ class Transaction:
             # If the query has failed the transaction should abort
             if type(result) == bool:
                 return self.abort()
-            else:
-                #increment table list. 
-                i = i+1
-                pass
         return self.commit()
 
     def undo(self, transaction_id, table):
-        with open("./log/" + table.name + "/"  + transaction_id, 'rb') as file:
+        with open("./log/" + table.name + "/"  + str(transaction_id), 'rb') as file:
             query = pickle.load(file)
         if query['operation'] == "update":
-            table.undo_update(query['new_record'], query['old_rid'], query['old_indirection'], query['old_schema'])
+            table.undo_update(query['rid'], query['old_rid'], query['old_indirection'], query['old_schema'])
         if query['operation'] == "insert":
             table.undo_insert(query['rid'])
 
     def abort(self):
-        i = 0
-        for table in self.tables:
-            table.undo(self.transaction_ids[i])
-            i
+        print("abort", self.transaction_ids)
+        for i in range(len(self.transaction_ids)):
+            self.undo(self.transaction_ids[i], self.tables[i])
         return False
 
     def commit(self):
-
+        print("commit", self.transaction_ids)
         cwd = os.getcwd()
-        i = 0
-        for j in self.tables:
-            path = cwd + +"\\" + j + "\log\\" + self.transaction_ids[i]
+        for i, query_id in enumerate(self.transaction_ids):
+            path = cwd  + "\log\\"  + self.tables[i].name +"\\" + str(query_id)
             os.remove(path)
-            i = i+1
+        self.transaction_ids = []
+        self.queries = []
+        self.tables = []
+        self.transaction_type = []
         return True

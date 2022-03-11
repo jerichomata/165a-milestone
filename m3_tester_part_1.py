@@ -6,6 +6,7 @@ from lstore.transaction_worker import TransactionWorker
 from random import choice, randint, sample, seed
 
 db = Database()
+db.open()
 # creating grades table
 grades_table = db.create_table('Grades', 5, 0)
 
@@ -16,8 +17,8 @@ query = Query(grades_table)
 records = {}
 
 number_of_records = 1000
-number_of_transactions = 100
-num_threads = 8
+number_of_transactions = 2
+num_threads = 2
 
 # create index on the non primary columns
 try:
