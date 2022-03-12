@@ -32,38 +32,34 @@ class Transaction:
         for query in self.queries:
             lock.acquire()
             passes_lock = query['table'].lock_manager.check_lock(query['key'], query['name'])
-            
+            get_lock = query['table'].lock_manager.get_lock(query['key'])
+            # print(passes_lock)
             if(passes_lock):
-                print(query['name'])
                 if query['name'] == "update" or query['name'] == "insert":
                     query['table'].lock_manager.set_lock(query['key'])
 
                 elif query['name'] == "select":
                     query['table'].lock_manager.set_shared(query['key'])
+                    query['table'].lock_manager.count[query['key']]+=1
+
                 lock.release()
+
+                query['id'] = query['function'](*query['args'])
+
+                lock.acquire()
+                if(query['name'] == "select"):
+                    query['table'].lock_manager.count[query['key']]-=1
+                    if query['table'].lock_manager.count[query['key']] == 0:
+                        query['table'].lock_manager.release_lock(query['key'])
+                lock.release()
+                
             else:
                 lock.release()
-                lock.acquire()
+                print("aborted", query['key'], query['name'], get_lock)
                 self.abort()
-                lock.release()
                 return False
 
-        for query in self.queries:
-
-            query['id'] = query['function'](*query['args'])
-
-            lock.acquire()
-            if(query['name'] == "select"):
-                query['table'].lock_manager.count[query['key']]-=1
-                if query['table'].lock_manager.count[query['key']] == 0:
-                    query['table'].lock_manager.release_lock(query['key'])
-            lock.release()
-                
-            
-
-        lock.acquire()
         self.commit()
-        lock.release()
         return True
 
     def undo(self, query_id, table):
@@ -77,9 +73,8 @@ class Transaction:
     def abort(self):
         # print([x['id'] for x in self.queries if(x['id'] != None)])
         for query in self.queries:
-            if(query['id'] != None and query['id'] != False and query['name'] != "select"):
+            if(query['id'] != None and query['name'] != "select"):
                 self.undo(query['id'], query['table'])
-                query['table'].lock_manager.release_lock(query['key'])
 
     def commit(self):
         cwd = os.getcwd()

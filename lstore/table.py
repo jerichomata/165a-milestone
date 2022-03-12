@@ -386,34 +386,31 @@ class Table:
         offsets = {}
         for column_index in range(self.num_columns_hidden):
             #grab newest base page from pool
-            lock.acquire()
             page = self.bpool.find_page(self.name, True, newest_base_pages[column_index])[0]
             #check if page has space
             if page.has_capacity():
-                
+
                 #pin the page then add to pages and offsets dictionary where value was written
                 self.bpool.pin_page(page)
                 pages[column_index] = newest_base_pages[column_index]
-                lock.release()
                 offsets[column_index] = page.write(record.columns[column_index])
 
                 #unpin and mark dirty
                 self.bpool.unpin_page(page)
                 self.bpool.mark_dirty(page)
             else:
-                lock.release()
+
                 #increment number of pages and make a new page
                 lock.acquire()
-                for new_column_index in range(self.num_columns_hidden):
-                    self.base_pages += 1
-                    pages[new_column_index] = self.base_pages
-                
-                print(pages)
+                base_pages = self.base_pages
+                self.base_pages += self.num_columns_hidden
+                lock.release()
                 for new_column_index in range(self.num_columns_hidden):
                     base_pages += 1
-                    page = Page("B" + str(pages[new_column_index]), self.name)
+                    page = Page("B" + str(base_pages), self.name)
 
                     #add to pages and offsets dictionary where value was written
+                    pages[new_column_index] = base_pages
                     offsets[new_column_index] = page.write(record.columns[new_column_index])
 
                     #add page to pool and mark dirty
@@ -421,10 +418,7 @@ class Table:
                     self.bpool.mark_dirty(new_page_in_pool)
 
                     #update newest base pages at this column index to be this new page that was created
-
-                    self.newest_base_pages[new_column_index] = pages[new_column_index]
-
-                lock.release()
+                    self.newest_base_pages[new_column_index] = base_pages
 
                 added_new_base_page_range = True
         
@@ -438,8 +432,6 @@ class Table:
         
         self.page_directory[record.rid] = {'base':True, 'pages':pages, 'offsets':offsets}
         self.index.insert(record, record.rid)
-
-        print(record.columns)
         return id
 
 
