@@ -1,14 +1,23 @@
 import pickle
 import os
-
+import threading
 class LockManager:
 
     def __init__(self):
         self.write_lock_table = {}
-        self.readerCount = 0
         self.read_lock_table = {}
+        self.threading_lock = threading.Lock()
+
+    def __getstate__(self):
+        return
+
+    def __setstate__(self):
+        self.write_lock_table = {}
+        self.read_lock_table = {}
+        self.threading_lock = threading.Lock()
 
     def check_lock(self, rid, query_type):
+        self.threading_lock.acquire()
         if rid not in self.write_lock_table.keys(): 
             self.write_lock_table[rid] = False
 
@@ -17,12 +26,16 @@ class LockManager:
         write_result = self.write_lock_table[rid]
         read_result = self.read_lock_table[rid]
         if read_result > 0 and (query_type == "insert" or query_type == "update"):
+            self.threading_lock.release()
             return False
         elif write_result == False and query_type == "select":
+            self.threading_lock.release()
             return True
         elif write_result == True:
+            self.threading_lock.release()
             return False
         else:
+            self.threading_lock.release()
             return True
 
     def get_lock(self, rid):

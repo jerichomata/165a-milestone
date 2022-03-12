@@ -40,7 +40,6 @@ class Query:
     def insert(self, *columns):
         columns =  list(columns)
         new_record = Record(self.table.get_new_rid(), columns[self.table.primary_key_column], columns)
-        self.keys.append(columns[self.table.primary_key_column])
         
         return self.table.add_record(new_record)
 
@@ -72,19 +71,17 @@ class Query:
     """
 
     def update(self, primary_key, *columns):
-        if(primary_key in self.keys):
-            base_rid = self.table.index.locate(primary_key)
-            if base_rid is None:
-                return False
-            else:
-                base_rid = base_rid[0]
-            
-            rid = self.table.get_new_rid()
-            new_record = Record(rid, primary_key, list(columns))
-            
+        base_rid = self.table.index.locate(primary_key)
+        if base_rid is None:
+            return False
+        else:
+            base_rid = base_rid[0]
+        
+        rid = self.table.get_new_rid()
+        new_record = Record(rid, primary_key, list(columns))
+        
 
-            return self.table.update_record(new_record, base_rid)
-        return False
+        return self.table.update_record(new_record, base_rid)
             
 
     """

@@ -76,12 +76,12 @@ class Table:
     def __getstate__(self):
         return (self.name, self.primary_key_column, self.primary_key_column_hidden, 
             self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages,
-            self.merge_in_progress, self.logger, self.lock_manager, self.index, self.bpool, self.mpool, self.tps_list)
+            self.merge_in_progress, self.logger, self.index, self.bpool, self.mpool, self.tps_list)
     
     def __setstate__(self, state):
 
-        self.name, self.primary_key_column, self.primary_key_column_hidden, self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages,self.merge_in_progress, self.logger, self.lock_manager, self.index, self.bpool, self.mpool, self.tps_list = state
-
+        self.name, self.primary_key_column, self.primary_key_column_hidden, self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages,self.merge_in_progress, self.logger, self.index, self.bpool, self.mpool, self.tps_list = state
+        self.lock_manager = LockManager()
         self.threading_lock = threading.Lock()
 
     def get_base_rid(self, rid):
@@ -158,12 +158,13 @@ class Table:
         return None
 
     def get_record(self, base_rid, query_columns):
-        self.threading_lock.acquire()
+        
+        
         if self.lock_manager.check_lock(base_rid, "select"):
             self.lock_manager.set_shared(base_rid)
         else:
             return False
-        self.threading_lock.release()
+        
 
         return_query_columns = query_columns
         number_of_values_queried = query_columns.count(1)
@@ -198,9 +199,7 @@ class Table:
                     self.bpool.unpin_page(base_column_page)
                     return_query_columns[column] = value
 
-            self.threading_lock.acquire()
             self.lock_manager.release_shared(base_rid)
-            self.threading_lock.release()
 
             return return_query_columns
 
@@ -237,6 +236,7 @@ class Table:
                         self.bpool.unpin_page(base_column_page)
                         return_query_columns[column] = value
 
+                self.lock_manager.release_shared(base_rid)
                 return return_query_columns
             else:
                 self.threading_lock.release()
@@ -252,12 +252,10 @@ class Table:
             #     self.threading_lock.release()
 
             
-            self.threading_lock.acquire()
             if self.lock_manager.check_lock(next_indirection, "select"):
                 self.lock_manager.set_shared(next_indirection)
             else:
                 return False
-            self.threading_lock.release()
             
             tail_location = self.page_directory[next_indirection]
             tail_pages = tail_location['pages']
@@ -283,7 +281,7 @@ class Table:
 
             
             if actual_number_of_values_queried == number_of_values_queried:
-                
+                self.lock_manager.release_shared(next_indirection)
                 break
             
         
@@ -291,18 +289,14 @@ class Table:
             self.bpool.pin_page(tail_indirection)
             tail_indirection[1] = time()
 
-            self.threading_lock.acquire()
             self.lock_manager.release_shared(next_indirection)
-            self.threading_lock.release()
 
             next_indirection = tail_indirection[0].read(tail_offsets[INDIRECTION_COLUMN])
             self.bpool.unpin_page(tail_indirection)
             iterations += 1
 
 
-        self.threading_lock.acquire()
         self.lock_manager.release_shared(base_rid)
-        self.threading_lock.release()
         return return_query_columns
 
 
@@ -399,13 +393,11 @@ class Table:
 
     def add_record(self, record):
         
-        self.threading_lock.acquire()
         if self.lock_manager.check_lock(record.rid, "insert"):
             self.lock_manager.set_lock(record.rid)
         else:
             return False
         
-        self.threading_lock.release()
 
         query_id = self.logger.log_insert(record, self.threading_lock)
         
@@ -445,12 +437,10 @@ class Table:
             else:
 
                 #increment number of pages and make a new page
-                self.threading_lock.acquire()
                 base_pages = self.base_pages
                 for new_column_index in range(self.num_columns_hidden):
                     self.base_pages += 1
                     pages[new_column_index] = self.base_pages
-                self.threading_lock.release()
                 for new_column_index in range(self.num_columns_hidden):
                     base_pages += 1
                     page = Page("B" + str(pages[new_column_index]), self.name)
@@ -480,20 +470,17 @@ class Table:
 
 
     def update_record(self, record, base_rid):
-
-        self.threading_lock.acquire()
         if self.lock_manager.check_lock(record.rid, "update"):
             self.lock_manager.set_lock(record.rid)
         else:
             return False
-
         if self.lock_manager.check_lock(base_rid, "update"):
             self.lock_manager.set_lock(base_rid)
         else:
             return False
-        self.threading_lock.release()
+        
 
-        print("updating" , base_rid)
+        
     
         new_rid = record.rid
 
@@ -514,9 +501,8 @@ class Table:
         schema_encoding_base = self.get_value(base_rid, SCHEMA_ENCODING_COLUMN)
         schema_encoding_base_string = format(schema_encoding_base, "064b")
 
-        self.threading_lock.acquire()
+
         query_id = self.logger.log_update(record, base_rid, old_base_indirection, schema_encoding_base, self.threading_lock)
-        self.threading_lock.release()
 
         for i in range(self.num_columns):
             if(record.columns[i+3] == None):

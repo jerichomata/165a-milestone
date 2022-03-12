@@ -35,17 +35,19 @@ class Transaction:
 
     # If you choose to implement this differently this method must still return True if transaction commits or False on abort
     def run(self):
-        
         for query in self.queries:
-            print(query[0].__name__)
             result = query[0](*query[2])
+            
             # If the query has failed the transaction should abort
             if result == False:
-                return self.abort()
+                self.abort()
+                return False
             else:
                 if query[0].__name__ == "insert" or query[0].__name__ == "update":
                     self.query_ids.append([query[0].__name__, result, query[1]])
-        return self.commit()
+        
+        self.commit()
+        return True
 
     def undo(self, query_id, table):
         with open("./log/" + table.name + "/"  + str(query_id), 'rb') as file:
@@ -56,21 +58,18 @@ class Transaction:
             table.undo_insert(query_log['rid'])
 
     def abort(self):
-        print("abort")
         for query in self.query_ids:
+            print(query[0], query[1])
             query[2].undo(query[1])
         self.release_locks()
         return False
 
     def commit(self):
-        print("commit")
         self.release_locks()
         return True
 
     def release_locks(self):
-        self.threading_lock.acquire()
         for query in self.query_ids:
-            print(query[0])
             if query[0] != "select":
                 with open("./log/" + query[2].name + "/"  + str(query[1]), 'rb') as file:
                     query_log = pickle.load(file)
@@ -79,5 +78,3 @@ class Transaction:
                 elif query[0] == "update":
                     query[2].lock_manager.release_lock(query_log['rid'])
                     query[2].lock_manager.release_lock(query_log['old_rid'])
-
-        self.threading_lock.release()
