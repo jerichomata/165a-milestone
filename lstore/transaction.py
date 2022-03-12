@@ -49,6 +49,8 @@ class Transaction:
                 lock.acquire()
                 if(query['name'] == "select"):
                     query['table'].lock_manager.count[query['key']]-=1
+                    if query['table'].lock_manager.count[query['key']] == 0:
+                        query['table'].lock_manager.release_lock(query['key'])
                 lock.release()
                 
             else:
@@ -69,9 +71,9 @@ class Transaction:
             table.undo_insert(query_log['rid'])
 
     def abort(self):
-        print([x['id'] for x in self.queries if(x['id'] != None)])
+        # print([x['id'] for x in self.queries if(x['id'] != None)])
         for query in self.queries:
-            if(query['id'] != None):
+            if(query['id'] != None and query['name'] != "select"):
                 self.undo(query['id'], query['table'])
 
     def commit(self):

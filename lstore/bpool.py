@@ -101,15 +101,11 @@ class bufferpool:
         elif(merged):
             page_type = "MB"
 
-        lock = threading.Lock()
-        lock.acquire()
         exist_index = self.exist_in_bpool(page_type, page_number)
-
 
         if(exist_index > -1):
             self.bpool[exist_index][1] = time.time()
             page = self.bpool[exist_index]
-            lock.release()
             return page
         else:
             page_find = Page(page_type + str(page_number), table_name)
@@ -121,7 +117,6 @@ class bufferpool:
 
 
             return_page = self.add_page(page_find)
-            lock.release()
             return return_page
             
         

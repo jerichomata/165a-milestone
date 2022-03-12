@@ -402,10 +402,9 @@ class Table:
 
                 #increment number of pages and make a new page
                 lock.acquire()
-                for new_column_index in range(self.num_columns_hidden):
-                    self.base_pages += 1
-                    self.newest_base_pages[new_column_index] = self.base_pages
-                
+                base_pages = self.base_pages
+                self.base_pages += self.num_columns_hidden
+                lock.release()
                 for new_column_index in range(self.num_columns_hidden):
                     base_pages += 1
                     page = Page("B" + str(base_pages), self.name)
@@ -421,7 +420,6 @@ class Table:
                     #update newest base pages at this column index to be this new page that was created
                     self.newest_base_pages[new_column_index] = base_pages
 
-                lock.release()
                 added_new_base_page_range = True
         
         
