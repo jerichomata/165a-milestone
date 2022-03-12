@@ -3,6 +3,7 @@ from lstore.index import Index
 from lstore.logger import Logger
 import threading
 import os
+import pickle
 
 #check_lock -> go to hashtable, 
 #make_shared
@@ -16,8 +17,7 @@ class Transaction:
     """
     def __init__(self):
         self.queries = []
-        self.transaction_ids = []
-        self.transaction_type = []
+        self.query_ids = []
         self.tables = []
         self.threading_lock = threading.Lock()
         pass
@@ -30,53 +30,50 @@ class Transaction:
     # t.add_query(q.update, grades_table, 0, *[None, 1, None, 2, None])
     """
     def add_query(self, query, table, *args):
-        self.tables.append(table)
-        self.queries.append((query, args))
+        self.queries.append((query, table, args))
         # use grades_table for aborting
 
     # If you choose to implement this differently this method must still return True if transaction commits or False on abort
     def run(self):
-        i = 0
-        for query, args in self.queries:
-            #Acquire the lock to check if the record is ok to continue
-            self.threading_lock.acquire()
-            #passes in base_rid & query type to check if it can run the operation
-            can_run = self.tables[i].check_lock(args[0], query.__name__)
-            if(can_run):
-                self.threading_lock.release()
-                if(can_run == False):
-                    self.abort()
-                else:
-                    #gets transaction_id from log & appends to transactions list
-                    #query will return bool False if fail, transaction_id if successful
-                    result = query(args)
-
-                    self.transaction_type.append(query.__name__)
-                    self.transaction_ids.append(result)
-            else:
-                self.threading_lock.release()
-                return self.abort()
+        
+        for query in self.queries:
+            result = query[0](*query[2])
             # If the query has failed the transaction should abort
-            if type(result) == bool:
+            if result == False:
                 return self.abort()
             else:
-                #increment table list. 
-                i = i+1
-                pass
+                if query[0].__name__ == "insert" or query[0].__name__ == "update":
+                    self.query_ids.append([query[0].__name__, result, query[1]])
         return self.commit()
 
+    def undo(self, query_id, table):
+        with open("./log/" + table.name + "/"  + str(query_id), 'rb') as file:
+            query_log = pickle.load(file)
+        if query_log['operation'] == "update":
+            table.undo_update(query_log['rid'], query_log['old_rid'], query_log['old_indirection'], query_log['old_schema'])
+        if query_log['operation'] == "insert":
+            table.undo_insert(query_log['rid'])
+
     def abort(self):
-        i = 0
-        for table in self.tables:
-            table.undo(self.transaction_ids[i])
+        for query in self.query_ids:
+            query[2].undo(query[1])
+        self.release_locks()
         return False
 
     def commit(self):
-
-        cwd = os.getcwd()
-        i = 0
-        for j in self.tables:
-            path = cwd + +"\\" + j + "\log\\" + self.transaction_ids[i]
-            os.remove(path)
-            i = i+1
+        self.release_locks()
         return True
+
+    def release_locks(self):
+        self.threading_lock.acquire()
+        for query in self.query_ids:
+            if query[0] != "select":
+                with open("./log/" + query[2].name + "/"  + str(query[1]), 'rb') as file:
+                    query_log = pickle.load(file)
+                if query[0] == "insert":
+                    query[2].lock_manager.release_lock(query_log['rid'])
+                elif query[0] == "update":
+                    query[2].lock_manager.release_lock(query_log['rid'])
+                    query[2].lock_manager.release_lock(query_log['old_rid'])
+
+        self.threading_lock.release()

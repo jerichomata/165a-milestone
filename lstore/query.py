@@ -1,3 +1,4 @@
+from re import S
 from lstore.table import Table, Record
 from lstore.index import Index
 
@@ -40,8 +41,8 @@ class Query:
         columns =  list(columns)
         new_record = Record(self.table.get_new_rid(), columns[self.table.primary_key_column], columns)
         self.keys.append(columns[self.table.primary_key_column])
-        self.table.add_record(new_record)
-        return True
+        
+        return self.table.add_record(new_record)
 
     """
     # Read a record with specified key
@@ -58,6 +59,8 @@ class Query:
         locations = self.table.index.locate(index_value, index_column)
         for location in locations:
             columns = self.table.get_record(location, query_columns)
+            if columns == False:
+                return False
             new_record = Record(location, columns[self.table.primary_key_column], columns)
             records_objects.append(new_record)
         return records_objects
@@ -78,9 +81,9 @@ class Query:
             
             rid = self.table.get_new_rid()
             new_record = Record(rid, primary_key, list(columns))
-            self.table.update_record(new_record, base_rid)
+            
 
-            return True
+            return self.table.update_record(new_record, base_rid)
         return False
             
 

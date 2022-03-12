@@ -1,13 +1,15 @@
 from lstore.index import Index
+from lstore.logger import Logger
 from lstore.mpool import mergepool
 from lstore.page import Page
 from lstore.bpool import bufferpool
+from lstore.lock_manager import LockManager
+
 from time import time
 
 import os
 import threading
 import struct
-import pickle
 
 INDIRECTION_COLUMN = 0
 RID_COLUMN = 1
@@ -61,6 +63,9 @@ class Table:
         self.newest_tail_pages = {}
         self.merge_in_progress = {}
 
+        self.logger = Logger(self.name)
+        self.lock_manager = LockManager()
+
         self.index = Index(self)
         self.bpool = bpool
         self.mpool = mergepool()
@@ -71,14 +76,13 @@ class Table:
     def __getstate__(self):
         return (self.name, self.primary_key_column, self.primary_key_column_hidden, 
             self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages,
-            self.index, self.bpool, self.mpool, self.tps_list)
+            self.merge_in_progress, self.logger, self.lock_manager, self.index, self.bpool, self.mpool, self.tps_list)
     
     def __setstate__(self, state):
 
-        self.name, self.primary_key_column, self.primary_key_column_hidden, self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages, self.index, self.bpool, self.mpool, self.tps_list = state
+        self.name, self.primary_key_column, self.primary_key_column_hidden, self.num_columns, self.num_columns_hidden, self.current_rid, self.num_records, self.page_directory, self.base_pages, self.tail_pages, self.newest_base_pages, self.newest_tail_pages,self.merge_in_progress, self.logger, self.lock_manager, self.index, self.bpool, self.mpool, self.tps_list = state
 
         self.threading_lock = threading.Lock()
-        self.threads = {}
 
     def get_base_rid(self, rid):
         current_rid = rid
@@ -154,6 +158,13 @@ class Table:
         return None
 
     def get_record(self, base_rid, query_columns):
+        self.threading_lock.acquire()
+        if self.lock_manager.check_lock(base_rid, "select"):
+            self.lock_manager.set_shared(base_rid)
+        else:
+            return False
+        self.threading_lock.release()
+
         return_query_columns = query_columns
         number_of_values_queried = query_columns.count(1)
         actual_number_of_values_queried = 0
@@ -176,8 +187,7 @@ class Table:
         self.bpool.unpin_page(base_schema_encoding)
         
 
-        page_range = (base_pages[INDIRECTION_COLUMN]+self.num_columns_hidden - 1)/self.num_columns_hidden
-
+        page_range = int((base_pages[INDIRECTION_COLUMN]+self.num_columns_hidden - 1)/self.num_columns_hidden)
         if indirection_rid < self.tps_list[page_range]:
             for column, i in enumerate(query_columns):
                 if i == 1:
@@ -187,6 +197,10 @@ class Table:
                     value = base_column_page[0].read(base_offsets[column+4])
                     self.bpool.unpin_page(base_column_page)
                     return_query_columns[column] = value
+
+            self.threading_lock.acquire()
+            self.lock_manager.release_shared(base_rid)
+            self.threading_lock.release()
 
             return return_query_columns
 
@@ -227,16 +241,23 @@ class Table:
             else:
                 self.threading_lock.release()
             
-            self.threading_lock.acquire()
-            if iterations == 2 and self.merge_in_progress[int(page_range)] == False:
-                self.merge_in_progress[page_range] = True
-                self.threading_lock.release()
-                self.bpool.make_clean()
-                thread = threading.Thread(target = self.merge, args=(base_pages[INDIRECTION_COLUMN], ), daemon=True)
-                thread.start()
-            else:
-                self.threading_lock.release()
+            # self.threading_lock.acquire()
+            # if iterations == 2 and self.merge_in_progress[int(page_range)] == False:
+            #     self.merge_in_progress[page_range] = True
+            #     self.threading_lock.release()
+            #     self.bpool.make_clean()
+            #     thread = threading.Thread(target = self.merge, args=(base_pages[INDIRECTION_COLUMN], ), daemon=True)
+            #     thread.start()
+            # else:
+            #     self.threading_lock.release()
 
+            
+            self.threading_lock.acquire()
+            if self.lock_manager.check_lock(next_indirection, "select"):
+                self.lock_manager.set_shared(next_indirection)
+            else:
+                return False
+            self.threading_lock.release()
             
             tail_location = self.page_directory[next_indirection]
             tail_pages = tail_location['pages']
@@ -262,16 +283,27 @@ class Table:
 
             
             if actual_number_of_values_queried == number_of_values_queried:
-                return return_query_columns
+                
+                break
             
         
             tail_indirection = self.bpool.find_page(self.name, False, tail_pages[INDIRECTION_COLUMN])
             self.bpool.pin_page(tail_indirection)
             tail_indirection[1] = time()
+
+            self.threading_lock.acquire()
+            self.lock_manager.release_shared(next_indirection)
+            self.threading_lock.release()
+
             next_indirection = tail_indirection[0].read(tail_offsets[INDIRECTION_COLUMN])
             self.bpool.unpin_page(tail_indirection)
             iterations += 1
 
+
+        self.threading_lock.acquire()
+        self.lock_manager.release_shared(base_rid)
+        self.threading_lock.release()
+        return return_query_columns
 
 
     def get_value(self, rid, column):
@@ -367,6 +399,17 @@ class Table:
 
     def add_record(self, record):
         
+        self.threading_lock.acquire()
+        if self.lock_manager.check_lock(record.rid, "insert"):
+            self.lock_manager.set_lock(record.rid)
+        else:
+            return False
+        
+        self.threading_lock.release()
+
+        query_id = self.logger.log_insert(record, self.threading_lock)
+        
+        
         record.columns.insert(INDIRECTION_COLUMN, 1)
         record.columns.insert(RID_COLUMN, record.rid)
         record.columns.insert(TIMESTAMP_COLUMN, time())
@@ -382,7 +425,6 @@ class Table:
             self.tps_list[1] = 0
             self.merge_in_progress[1] = False
 
-        added_new_base_page_range = False
         pages = {}
         offsets = {}
         for column_index in range(self.num_columns_hidden):
@@ -403,32 +445,53 @@ class Table:
             else:
 
                 #increment number of pages and make a new page
-                self.base_pages += 1
-                page = Page("B" + str(self.base_pages), self.name)
+                self.threading_lock.acquire()
+                base_pages = self.base_pages
+                for new_column_index in range(self.num_columns_hidden):
+                    self.base_pages += 1
+                    pages[new_column_index] = self.base_pages
+                self.threading_lock.release()
+                for new_column_index in range(self.num_columns_hidden):
+                    base_pages += 1
+                    page = Page("B" + str(pages[new_column_index]), self.name)
 
-                #add to pages and offsets dictionary where value was written
-                pages[column_index] = self.base_pages
-                offsets[column_index] = page.write(record.columns[column_index])
+                    #add to pages and offsets dictionary where value was written
+                    offsets[new_column_index] = page.write(record.columns[new_column_index])
 
-                #add page to pool and mark dirty
-                new_page_in_pool = self.bpool.add_page(page)
-                self.bpool.mark_dirty(new_page_in_pool)
+                    #add page to pool and mark dirty
+                    new_page_in_pool = self.bpool.add_page(page)
+                    self.bpool.mark_dirty(new_page_in_pool)
 
-                #update newest base pages at this column index to be this new page that was created
-                self.newest_base_pages[column_index] = self.base_pages
-                added_new_base_page_range = True
+                    #update newest base pages at this column index to be this new page that was created
 
-        # add to tps list for new base page range if a new base page range was created.
-        if added_new_base_page_range:
-            self.tps_list[int(self.base_pages/self.num_columns_hidden)] = 0
-            self.merge_in_progress[int(self.base_pages/self.num_columns_hidden)] = False
+                    self.newest_base_pages[new_column_index] = pages[new_column_index]
+                # add to tps list for new base page range if a new base page range was created.
+                self.tps_list[int(base_pages/self.num_columns_hidden)] = 0
+                self.merge_in_progress[int(base_pages/self.num_columns_hidden)] = False
+                break
+
+        
         
 
         self.page_directory[record.rid] = {'base':True, 'pages':pages, 'offsets':offsets}
         self.index.insert(record, record.rid)
 
+        return query_id
+
 
     def update_record(self, record, base_rid):
+
+        self.threading_lock.acquire()
+        if self.lock_manager.check_lock(record.rid, "update"):
+            self.lock_manager.set_lock(record.rid)
+        else:
+            return False
+
+        if self.lock_manager.check_lock(base_rid, "update"):
+            self.lock_manager.set_lock(base_rid)
+        else:
+            return False
+        self.threading_lock.release()
     
         new_rid = record.rid
 
@@ -446,13 +509,18 @@ class Table:
         
 
         schema_encoding = ""
-        schema_encoding_base = format(self.get_value(base_rid, SCHEMA_ENCODING_COLUMN), "064b")
+        schema_encoding_base = self.get_value(base_rid, SCHEMA_ENCODING_COLUMN)
+        schema_encoding_base_string = format(schema_encoding_base, "064b")
+
+        self.threading_lock.acquire()
+        query_id = self.logger.log_update(record, base_rid, old_base_indirection, schema_encoding_base, self.threading_lock)
+        self.threading_lock.release()
 
         for i in range(self.num_columns):
             if(record.columns[i+3] == None):
                 schema_encoding += "0"
             else:
-                schema_encoding_base = schema_encoding_base[:i] + "1" + schema_encoding_base[i+1:]
+                schema_encoding_base_string = schema_encoding_base_string[:i] + "1" + schema_encoding_base_string[i+1:]
                 schema_encoding += "1"
 
         
@@ -461,7 +529,7 @@ class Table:
             schema_encoding_64 += "0"
         
         record.columns.insert(SCHEMA_ENCODING_COLUMN, int(schema_encoding_64,2))
-        self.set_value(int(schema_encoding_base,2), base_rid, SCHEMA_ENCODING_COLUMN)
+        self.set_value(int(schema_encoding_base_string,2), base_rid, SCHEMA_ENCODING_COLUMN)
 
         #Set indirection column on base page to point to this record.
         self.set_value(new_rid, base_rid, INDIRECTION_COLUMN)
@@ -556,8 +624,36 @@ class Table:
 
         self.page_directory[new_rid] = {'base':False, 'pages':pages, 'offsets':offsets}
         self.index.update(schema_encoding, record, base_rid)
+        return query_id
 
+    def undo_add(self, new_rid):
+        try:
+            del self.page_directory[new_rid]
+            self.index.drop_record(new_rid)
+        except:
+            pass
 
+    def undo_update(self, new_rid, old_rid, old_indirection, old_schema):
+        try:
+            del self.page_directory[new_rid]
+        except:
+            pass
+
+        location = self.page_directory[old_rid]
+        pages = location["pages"]
+        offsets = location["offsets"]
+
+        indirection_page = self.bpool.find_page(self.name, True, pages[INDIRECTION_COLUMN])
+        self.bpool.pin_page(indirection_page)
+        indirection_page.set_value(old_indirection, offsets[INDIRECTION_COLUMN])
+        self.bpool.mark_dirty(indirection_page)
+        self.bpool.unpin_page(indirection_page)
+
+        schema_encoding_page = self.bpool.find_page(self.name, True, pages[SCHEMA_ENCODING_COLUMN])
+        self.bpool.pin_page(schema_encoding_page)
+        schema_encoding_page.set_value(old_schema, offsets[SCHEMA_ENCODING_COLUMN])
+        self.bpool.mark_dirty(schema_encoding_page)
+        self.bpool.unpin_page(schema_encoding_page)
 
     def delete_record(self, key):
         starting_rid = self.index.locate(key)[0]

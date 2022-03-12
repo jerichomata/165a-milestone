@@ -10,7 +10,7 @@ class Database():
         pass
 
     # Not required for milestone1
-    def open(self, path): 
+    def open(self, path = "./ECS165"): 
         #db needs a bufferpool now
         self.bpool = bufferpool()
         #if database is new and there are previous files 

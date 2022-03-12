@@ -8,7 +8,7 @@ class bufferpool:
 
     #intialize a 3x5 bufferpool, this is an arbitrary size. 
     def __init__(self):
-        self.MAX_SIZE = 55
+        self.MAX_SIZE = 20
         #bufferpool that stores tuple ( page, time_accessed ).
         self.bpool = []
         self.path = []
@@ -122,7 +122,10 @@ class bufferpool:
         for pair in temp:
             if(pair not in self.pinned_pages):
                 self.make_clean2(pair[0])
-                self.bpool.remove(pair)
+                try:
+                    self.bpool.remove(pair)
+                except:
+                    pass
                 return # print("page evicted ", pair[0].name)
 
         
