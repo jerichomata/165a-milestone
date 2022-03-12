@@ -19,7 +19,7 @@ records = {}
 
 number_of_records = 1000
 number_of_transactions = 100
-num_threads = 4
+num_threads = 8
 
 # create index on the non primary columns
 try:

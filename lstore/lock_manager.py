@@ -13,13 +13,10 @@ class LockManager:
             self.lock_table[key] = "unlocked"
         result = self.lock_table[key] 
         if result == "unlocked":
-
             return True
         elif result == "locked":
-
             return False
         elif result == "shared" and query_type == "select":
-
             return True
         else:
             return False
