@@ -173,7 +173,6 @@ class Table:
         
 
         page_range = int((base_pages[INDIRECTION_COLUMN]+self.num_columns_hidden - 1)/self.num_columns_hidden)
-        print(self.tps_list)
         if indirection_rid < self.tps_list[page_range]:
             for column, i in enumerate(query_columns):
                 if i == 1:
@@ -336,10 +335,6 @@ class Table:
             tail_pages = tail_location['pages']
             tail_offsets = tail_location['offsets']
 
-
-            tail_schema_encoding = self.mpool.find_page( self.name, False, tail_pages[SCHEMA_ENCODING_COLUMN])
-            tail_schema_encoding_value = format(tail_schema_encoding.read(tail_offsets[SCHEMA_ENCODING_COLUMN]), '064b')
-
             for column in range(self.num_columns):
                 if tail_offsets[column+4] is not None:
                     tail_column_page = self.mpool.find_page( self.name, False, tail_pages[column+4])
@@ -373,8 +368,9 @@ class Table:
         record.columns.insert(TIMESTAMP_COLUMN, time())
         record.columns.insert(SCHEMA_ENCODING_COLUMN, 0)
 
-
-        if self.base_pages == 0:
+        lock.acquire()
+        base_pages = self.base_pages
+        if base_pages == 0:
             for i in range(self.num_columns_hidden):
                 self.base_pages += 1
                 index = self.bpool.add_page(Page("B" + str(self.base_pages),self.name))
@@ -383,19 +379,20 @@ class Table:
             self.tps_list[1] = 0
             self.merge_in_progress[1] = False
 
+        lock.release()
+        newest_base_pages = self.newest_base_pages
         added_new_base_page_range = False
         pages = {}
         offsets = {}
         for column_index in range(self.num_columns_hidden):
             #grab newest base page from pool
-            page = self.bpool.find_page(self.name, True, self.newest_base_pages[column_index])[0]
-
+            page = self.bpool.find_page(self.name, True, newest_base_pages[column_index])[0]
             #check if page has space
             if page.has_capacity():
 
                 #pin the page then add to pages and offsets dictionary where value was written
                 self.bpool.pin_page(page)
-                pages[column_index] = self.newest_base_pages[column_index]
+                pages[column_index] = newest_base_pages[column_index]
                 offsets[column_index] = page.write(record.columns[column_index])
 
                 #unpin and mark dirty
@@ -404,35 +401,43 @@ class Table:
             else:
 
                 #increment number of pages and make a new page
-                self.base_pages += 1
-                page = Page("B" + str(self.base_pages), self.name)
+                lock.acquire()
+                for new_column_index in range(self.num_columns_hidden):
+                    self.base_pages += 1
+                    self.newest_base_pages[new_column_index] = self.base_pages
+                
+                for new_column_index in range(self.num_columns_hidden):
+                    base_pages += 1
+                    page = Page("B" + str(base_pages), self.name)
 
-                #add to pages and offsets dictionary where value was written
-                pages[column_index] = self.base_pages
-                offsets[column_index] = page.write(record.columns[column_index])
+                    #add to pages and offsets dictionary where value was written
+                    pages[new_column_index] = base_pages
+                    offsets[new_column_index] = page.write(record.columns[new_column_index])
 
-                #add page to pool and mark dirty
-                new_page_in_pool = self.bpool.add_page(page)
-                self.bpool.mark_dirty(new_page_in_pool)
+                    #add page to pool and mark dirty
+                    new_page_in_pool = self.bpool.add_page(page)
+                    self.bpool.mark_dirty(new_page_in_pool)
 
-                #update newest base pages at this column index to be this new page that was created
-                self.newest_base_pages[column_index] = self.base_pages
+                    #update newest base pages at this column index to be this new page that was created
+                    self.newest_base_pages[new_column_index] = base_pages
+
+                lock.release()
                 added_new_base_page_range = True
+        
+        
 
         # add to tps list for new base page range if a new base page range was created.
 
         if added_new_base_page_range:
-            self.tps_list[int(self.base_pages/self.num_columns_hidden)] = 0
-            self.merge_in_progress[int(self.base_pages/self.num_columns_hidden)] = False
+            self.tps_list[int(base_pages/self.num_columns_hidden)] = 0
+            self.merge_in_progress[int(base_pages/self.num_columns_hidden)] = False
         
-
         self.page_directory[record.rid] = {'base':True, 'pages':pages, 'offsets':offsets}
         self.index.insert(record, record.rid)
         return id
 
 
     def update_record(self, record, base_rid):
-        
         new_rid = record.rid
 
         #Get old base page indirection to set as indirection column on this entry

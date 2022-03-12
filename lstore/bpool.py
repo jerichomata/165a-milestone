@@ -19,9 +19,12 @@ class bufferpool:
 
     #mark this page as dirty if it has been updated or recently created and not put to "disk".
     def mark_dirty(self, page):
+        lock = threading.Lock()
+        lock.acquire()
         if page in self.bpool and page not in self.dirty_pages:
             # print("marking dirty", self.bpool[index][0].name)
             self.dirty_pages.append(page)
+        lock.release()
 
     #push all updates to "disk".
     def make_clean(self):
@@ -53,30 +56,33 @@ class bufferpool:
 
 
     def pin_page(self, page):
+        lock = threading.Lock()
+        lock.acquire()
         if page in self.bpool and page not in self.pinned_pages:
             self.pinned_pages.append(page)
 
+        lock.release()
+
     def unpin_page(self, page):
+        lock = threading.Lock()
+        lock.acquire()
         try:
             self.pinned_pages.remove(page)
         except:
             pass
+        lock.release()
 
 
     #add page to bufferpool because it has been read, updated, or created.
     def add_page(self, page):
-        lock = threading.Lock()
-        lock.acquire()
         if(self.MAX_SIZE > len(self.bpool)):
             page_list = [page,time.time()]
             self.bpool.append(page_list)
-            lock.release()
             return page_list
         else:
             self.evict_page()
             page_list = [page,time.time()]
             self.bpool.append(page_list)
-            lock.release()
             return page_list
         
     def exist_in_bpool(self, page_type, page_number):
@@ -94,6 +100,7 @@ class bufferpool:
             page_type = "T"
         elif(merged):
             page_type = "MB"
+
         lock = threading.Lock()
         lock.acquire()
         exist_index = self.exist_in_bpool(page_type, page_number)
@@ -105,17 +112,19 @@ class bufferpool:
             lock.release()
             return page
         else:
+            page_find = Page(page_type + str(page_number), table_name)
+
+            with open(cwd + "\ECS165\\" + table_name + "\\" + page_type + str(page_number), 'rb') as file:
+                lines = file.read()
+                page_find.set_num_records(struct.unpack('Q', lines[:8])[0])
+                page_find.set_data(lines[8:])
+
+
+            return_page = self.add_page(page_find)
             lock.release()
+            return return_page
             
-        page_find = Page(page_type + str(page_number), table_name)
-
-        with open(cwd + "\ECS165\\" + table_name + "\\" + page_type + str(page_number), 'rb') as file:
-            lines = file.read()
-            page_find.set_num_records(struct.unpack('Q', lines[:8])[0])
-            page_find.set_data(lines[8:])
-
-
-        return self.add_page(page_find)
+        
 
     #evict page based on Least Recently Used page. 
     def evict_page(self):
@@ -129,19 +138,23 @@ class bufferpool:
         temp = self.bpool.copy()
         temp.sort(key = lambda x: x[1])
 
+        lock = threading.Lock()
+        lock.acquire()
+
         #find first page in pages that that is not pinned.
         for pair in temp:
             if(pair not in self.pinned_pages):
-                lock = threading.Lock()
-                lock.acquire()
-                self.make_clean2(pair[0])
-                lock.release()
+                
+                self.make_clean()
+                
                 try:
                     self.bpool.remove(pair)
                 except:
                     pass
+
+                lock.release()
                 return # print("page evicted ", pair[0].name)
 
-        
+        lock.release()
 
         return print("all of the pages in the bufferpool are pinned. ")    

@@ -28,6 +28,10 @@ class LockManager:
         return self.lock_table[key]
 
     def set_shared(self, key):
+        if self.lock_table[key] != "shared":
+            self.count[key] = 1
+        else:
+            self.count[key] += 1
         self.lock_table[key] = "shared"
 
     def set_lock(self, key):
