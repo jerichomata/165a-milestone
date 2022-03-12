@@ -37,6 +37,7 @@ class Transaction:
     def run(self):
         
         for query in self.queries:
+            print(query[0].__name__)
             result = query[0](*query[2])
             # If the query has failed the transaction should abort
             if result == False:
@@ -55,18 +56,21 @@ class Transaction:
             table.undo_insert(query_log['rid'])
 
     def abort(self):
+        print("abort")
         for query in self.query_ids:
             query[2].undo(query[1])
         self.release_locks()
         return False
 
     def commit(self):
+        print("commit")
         self.release_locks()
         return True
 
     def release_locks(self):
         self.threading_lock.acquire()
         for query in self.query_ids:
+            print(query[0])
             if query[0] != "select":
                 with open("./log/" + query[2].name + "/"  + str(query[1]), 'rb') as file:
                     query_log = pickle.load(file)

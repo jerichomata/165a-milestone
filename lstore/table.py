@@ -492,6 +492,8 @@ class Table:
         else:
             return False
         self.threading_lock.release()
+
+        print("updating" , base_rid)
     
         new_rid = record.rid
 
